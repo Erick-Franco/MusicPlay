@@ -1,19 +1,20 @@
 import { AddSongsToPlaylistModal } from "@/components/music/AddSongsToPlaylistModal";
 import { MiniPlayer } from "@/components/music/MiniPlayer";
-import { SongItem } from "@/components/music/SongItem";
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Song } from "@/types/types";
+import { formatDuration } from "@/utils/musicScanner";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -32,6 +33,8 @@ export default function PlaylistDetailScreen() {
     removeSongFromPlaylist,
     toggleShuffle,
     isShuffleOn,
+    toggleFavorite,
+    isFavorite,
   } = useMusicPlayer();
   const [showAddSongs, setShowAddSongs] = useState(false);
 
@@ -44,12 +47,26 @@ export default function PlaylistDetailScreen() {
       .filter((s): s is Song => s !== undefined);
   }, [playlist, songs]);
 
-  // Shuffle play
   const handleShufflePlay = () => {
     if (playlistSongs.length === 0) return;
     if (!isShuffleOn) toggleShuffle();
     const randomIdx = Math.floor(Math.random() * playlistSongs.length);
     playSong(playlistSongs[randomIdx], playlistSongs);
+  };
+
+  const handleRemoveSong = (songId: string, songTitle: string) => {
+    Alert.alert(
+      "Eliminar canción",
+      `¿Quitar "${songTitle}" de esta playlist?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: () => removeSongFromPlaylist(playlist!.id, songId),
+        },
+      ],
+    );
   };
 
   if (!playlist) {
@@ -143,13 +160,78 @@ export default function PlaylistDetailScreen() {
           data={playlistSongs}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <SongItem
-              song={item}
-              isActive={currentSong?.id === item.id}
+            <TouchableOpacity
+              style={[
+                styles.songRow,
+                {
+                  borderBottomColor: colors.border,
+                  backgroundColor:
+                    currentSong?.id === item.id
+                      ? colors.accent + "15"
+                      : "transparent",
+                },
+              ]}
               onPress={() => playSong(item, playlistSongs)}
-              onLongPress={() => removeSongFromPlaylist(playlist.id, item.id)}
-              showFavorite
-            />
+              activeOpacity={0.7}
+            >
+              {/* Artwork */}
+              <View style={[styles.artwork, { backgroundColor: colors.card }]}>
+                <Ionicons name="musical-note" size={20} color={colors.accent} />
+              </View>
+              {/* Info */}
+              <View style={styles.songInfo}>
+                <Text
+                  style={[
+                    styles.songTitle,
+                    {
+                      color:
+                        currentSong?.id === item.id
+                          ? colors.accent
+                          : colors.text,
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {item.title}
+                </Text>
+                <Text
+                  style={[styles.songArtist, { color: colors.textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {item.artist}
+                </Text>
+              </View>
+              {/* Duration */}
+              <Text
+                style={[styles.songDuration, { color: colors.textSecondary }]}
+              >
+                {formatDuration(item.duration)}
+              </Text>
+              {/* Favorite */}
+              <TouchableOpacity
+                onPress={() => toggleFavorite(item.id)}
+                style={styles.actionBtn}
+              >
+                <Ionicons
+                  name={isFavorite(item.id) ? "heart" : "heart-outline"}
+                  size={20}
+                  color={
+                    isFavorite(item.id) ? colors.favorite : colors.textSecondary
+                  }
+                />
+              </TouchableOpacity>
+              {/* Delete from playlist */}
+              <TouchableOpacity
+                onPress={() => handleRemoveSong(item.id, item.title)}
+                style={styles.actionBtn}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={18}
+                  color={colors.danger}
+                />
+              </TouchableOpacity>
+            </TouchableOpacity>
           )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -241,5 +323,25 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
   },
   addSongsBtnText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
+  songRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: Spacing.md,
+  },
+  artwork: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  songInfo: { flex: 1, gap: 2 },
+  songTitle: { fontSize: 14, fontWeight: "600" },
+  songArtist: { fontSize: 12 },
+  songDuration: { fontSize: 12 },
+  actionBtn: { padding: 4 },
   listContent: { paddingBottom: 120 },
 });

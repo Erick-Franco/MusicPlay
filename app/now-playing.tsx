@@ -139,6 +139,11 @@ export default function NowPlayingScreen() {
         </View>
       </View>
 
+      {/* Volume */}
+      <View style={styles.volumeContainer}>
+        <VolumeControl />
+      </View>
+
       {/* Progress */}
       <View style={styles.progressContainer}>
         <ProgressBar />
@@ -146,11 +151,6 @@ export default function NowPlayingScreen() {
 
       {/* Controls */}
       <PlayerControls size="large" />
-
-      {/* Volume */}
-      <View style={styles.volumeContainer}>
-        <VolumeControl />
-      </View>
 
       {/* Sleep Timer Modal */}
       <SleepTimerModal

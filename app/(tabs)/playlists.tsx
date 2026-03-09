@@ -8,12 +8,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -70,17 +70,6 @@ export default function PlaylistsScreen() {
         icon: "trending-up-outline",
         songIds: mostPlayed,
         color: "#FF6B6B",
-      });
-    }
-
-    // Favorites playlist
-    if (favoriteIds.size > 0) {
-      smart.push({
-        id: "favorites",
-        name: "Mis favoritas",
-        icon: "heart-outline",
-        songIds: Array.from(favoriteIds),
-        color: "#FF1744",
       });
     }
 

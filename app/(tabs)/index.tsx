@@ -10,6 +10,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -31,6 +32,8 @@ export default function LibraryScreen() {
     pickMusicFiles,
     toggleFavorite,
     isFavorite,
+    toggleShuffle,
+    isShuffleOn,
   } = useMusicPlayer();
 
   const [search, setSearch] = useState("");
@@ -40,7 +43,6 @@ export default function LibraryScreen() {
   );
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
-  // Extract unique genres from songs
   const genres = useMemo(() => {
     const genreSet = new Set<string>();
     songs.forEach((s) => {
@@ -51,11 +53,7 @@ export default function LibraryScreen() {
 
   const filteredSongs = useMemo(() => {
     let result = [...songs];
-    // Genre filter
-    if (selectedGenre) {
-      result = result.filter((s) => s.genre === selectedGenre);
-    }
-    // Search
+    if (selectedGenre) result = result.filter((s) => s.genre === selectedGenre);
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -65,7 +63,6 @@ export default function LibraryScreen() {
           s.album.toLowerCase().includes(q),
       );
     }
-    // Sort
     result.sort((a, b) => {
       switch (sortBy) {
         case SortBy.TITLE:
@@ -92,6 +89,13 @@ export default function LibraryScreen() {
     });
   }, []);
 
+  const handleShuffleAll = () => {
+    if (filteredSongs.length === 0) return;
+    if (!isShuffleOn) toggleShuffle();
+    const randomIdx = Math.floor(Math.random() * filteredSongs.length);
+    playSong(filteredSongs[randomIdx], filteredSongs);
+  };
+
   const getSortLabel = () => {
     switch (sortBy) {
       case SortBy.TITLE:
@@ -107,18 +111,24 @@ export default function LibraryScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Biblioteca
-        </Text>
+        <View style={styles.headerLeft}>
+          <Image
+            source={require("@/assets/images/logomusic.png")}
+            style={styles.logo}
+          />
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            MusicPlay
+          </Text>
+        </View>
         <View style={{ flexDirection: "row", gap: Spacing.sm }}>
-          <TouchableOpacity onPress={pickMusicFiles} style={styles.scanBtn}>
+          <TouchableOpacity onPress={pickMusicFiles} style={styles.iconBtn}>
             <Ionicons
               name="folder-open-outline"
               size={22}
               color={colors.accent}
             />
           </TouchableOpacity>
-          <TouchableOpacity onPress={loadDeviceMusic} style={styles.scanBtn}>
+          <TouchableOpacity onPress={loadDeviceMusic} style={styles.iconBtn}>
             {isLoadingLibrary ? (
               <ActivityIndicator size="small" color={colors.accent} />
             ) : (
@@ -186,17 +196,28 @@ export default function LibraryScreen() {
         </ScrollView>
       )}
 
-      {/* Sort controls */}
+      {/* Sort + Shuffle controls */}
       <View style={styles.sortBar}>
         <Text style={[styles.songCount, { color: colors.textSecondary }]}>
           {filteredSongs.length} canciones
         </Text>
-        <TouchableOpacity onPress={cycleSortBy} style={styles.sortBtn}>
-          <Ionicons name="swap-vertical" size={16} color={colors.accent} />
-          <Text style={[styles.sortLabel, { color: colors.accent }]}>
-            {getSortLabel()}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.sortActions}>
+          <TouchableOpacity
+            onPress={handleShuffleAll}
+            style={styles.shuffleAllBtn}
+          >
+            <Ionicons name="shuffle" size={16} color={colors.accent} />
+            <Text style={[styles.sortLabel, { color: colors.accent }]}>
+              Aleatorio
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={cycleSortBy} style={styles.sortBtn}>
+            <Ionicons name="swap-vertical" size={16} color={colors.accent} />
+            <Text style={[styles.sortLabel, { color: colors.accent }]}>
+              {getSortLabel()}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Song list */}
@@ -238,8 +259,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
   },
-  headerTitle: { fontSize: 28, fontWeight: "800" },
-  scanBtn: { padding: Spacing.sm },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
+  logo: { width: 32, height: 32, borderRadius: 8 },
+  headerTitle: { fontSize: 24, fontWeight: "800" },
+  iconBtn: { padding: Spacing.sm },
   genreScroll: { maxHeight: 44, marginBottom: Spacing.xs },
   genreContent: { paddingHorizontal: Spacing.lg, gap: Spacing.xs },
   genreChip: {
@@ -257,6 +280,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
   },
   songCount: { fontSize: 13 },
+  sortActions: { flexDirection: "row", gap: Spacing.md },
+  shuffleAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    padding: Spacing.xs,
+  },
   sortBtn: {
     flexDirection: "row",
     alignItems: "center",

@@ -75,6 +75,22 @@ export default function EqualizerScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Info notice */}
+        <View
+          style={[styles.infoNotice, { backgroundColor: colors.accent + "12" }]}
+        >
+          <Ionicons
+            name="information-circle-outline"
+            size={18}
+            color={colors.accent}
+          />
+          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+            El ecualizador visual muestra el perfil de sonido del preset
+            seleccionado. Los efectos de audio reales requieren un build nativo
+            con módulos de EQ.
+          </Text>
+        </View>
+
         {/* Visual EQ bands */}
         <View style={styles.eqContainer}>
           <View style={styles.bandsRow}>
@@ -171,6 +187,16 @@ const styles = StyleSheet.create({
   backBtn: { padding: Spacing.sm },
   title: { fontSize: 17, fontWeight: "700" },
   scrollContent: { paddingBottom: 40 },
+  infoNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  infoText: { flex: 1, fontSize: 12, lineHeight: 16 },
   eqContainer: { padding: Spacing.xl, paddingTop: Spacing.lg },
   bandsRow: {
     flexDirection: "row",
