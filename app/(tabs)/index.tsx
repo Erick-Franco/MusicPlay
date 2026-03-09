@@ -1,98 +1,268 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { AddToPlaylistModal } from "@/components/music/AddToPlaylistModal";
+import { SearchBar } from "@/components/music/SearchBar";
+import { SongItem } from "@/components/music/SongItem";
+import { BorderRadius, Colors, Spacing } from "@/constants/theme";
+import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { SortBy } from "@/types/types";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useCallback, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function LibraryScreen() {
+  const colorScheme = useColorScheme() ?? "dark";
+  const colors = Colors[colorScheme];
+  const insets = useSafeAreaInsets();
+  const {
+    songs,
+    currentSong,
+    playSong,
+    isLoadingLibrary,
+    loadDeviceMusic,
+    pickMusicFiles,
+    toggleFavorite,
+    isFavorite,
+  } = useMusicPlayer();
 
-export default function HomeScreen() {
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState(SortBy.TITLE);
+  const [addToPlaylistSongId, setAddToPlaylistSongId] = useState<string | null>(
+    null,
+  );
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
+
+  // Extract unique genres from songs
+  const genres = useMemo(() => {
+    const genreSet = new Set<string>();
+    songs.forEach((s) => {
+      if (s.genre) genreSet.add(s.genre);
+    });
+    return Array.from(genreSet).sort();
+  }, [songs]);
+
+  const filteredSongs = useMemo(() => {
+    let result = [...songs];
+    // Genre filter
+    if (selectedGenre) {
+      result = result.filter((s) => s.genre === selectedGenre);
+    }
+    // Search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (s) =>
+          s.title.toLowerCase().includes(q) ||
+          s.artist.toLowerCase().includes(q) ||
+          s.album.toLowerCase().includes(q),
+      );
+    }
+    // Sort
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case SortBy.TITLE:
+          return a.title.localeCompare(b.title);
+        case SortBy.ARTIST:
+          return a.artist.localeCompare(b.artist);
+        case SortBy.ALBUM:
+          return a.album.localeCompare(b.album);
+      }
+    });
+    return result;
+  }, [songs, search, sortBy, selectedGenre]);
+
+  const cycleSortBy = useCallback(() => {
+    setSortBy((prev) => {
+      switch (prev) {
+        case SortBy.TITLE:
+          return SortBy.ARTIST;
+        case SortBy.ARTIST:
+          return SortBy.ALBUM;
+        case SortBy.ALBUM:
+          return SortBy.TITLE;
+      }
+    });
+  }, []);
+
+  const getSortLabel = () => {
+    switch (sortBy) {
+      case SortBy.TITLE:
+        return "Título";
+      case SortBy.ARTIST:
+        return "Artista";
+      case SortBy.ALBUM:
+        return "Álbum";
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Biblioteca
+        </Text>
+        <View style={{ flexDirection: "row", gap: Spacing.sm }}>
+          <TouchableOpacity onPress={pickMusicFiles} style={styles.scanBtn}>
+            <Ionicons
+              name="folder-open-outline"
+              size={22}
+              color={colors.accent}
             />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={loadDeviceMusic} style={styles.scanBtn}>
+            {isLoadingLibrary ? (
+              <ActivityIndicator size="small" color={colors.accent} />
+            ) : (
+              <Ionicons
+                name="refresh-outline"
+                size={22}
+                color={colors.accent}
               />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      {/* Search */}
+      <SearchBar value={search} onChangeText={setSearch} />
+
+      {/* Genre chips */}
+      {genres.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.genreScroll}
+          contentContainerStyle={styles.genreContent}
+        >
+          <TouchableOpacity
+            style={[
+              styles.genreChip,
+              { backgroundColor: !selectedGenre ? colors.accent : colors.card },
+            ]}
+            onPress={() => setSelectedGenre(null)}
+          >
+            <Text
+              style={[
+                styles.genreText,
+                { color: !selectedGenre ? "#FFF" : colors.text },
+              ]}
+            >
+              Todos
+            </Text>
+          </TouchableOpacity>
+          {genres.map((genre) => (
+            <TouchableOpacity
+              key={genre}
+              style={[
+                styles.genreChip,
+                {
+                  backgroundColor:
+                    selectedGenre === genre ? colors.accent : colors.card,
+                },
+              ]}
+              onPress={() =>
+                setSelectedGenre(selectedGenre === genre ? null : genre)
+              }
+            >
+              <Text
+                style={[
+                  styles.genreText,
+                  { color: selectedGenre === genre ? "#FFF" : colors.text },
+                ]}
+              >
+                {genre}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* Sort controls */}
+      <View style={styles.sortBar}>
+        <Text style={[styles.songCount, { color: colors.textSecondary }]}>
+          {filteredSongs.length} canciones
+        </Text>
+        <TouchableOpacity onPress={cycleSortBy} style={styles.sortBtn}>
+          <Ionicons name="swap-vertical" size={16} color={colors.accent} />
+          <Text style={[styles.sortLabel, { color: colors.accent }]}>
+            {getSortLabel()}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Song list */}
+      <FlatList
+        data={filteredSongs}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <SongItem
+            song={item}
+            isActive={currentSong?.id === item.id}
+            onPress={() => playSong(item, filteredSongs)}
+            onLongPress={() => setAddToPlaylistSongId(item.id)}
+            showFavorite
+            isFavorite={isFavorite(item.id)}
+            onToggleFavorite={() => toggleFavorite(item.id)}
+          />
+        )}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      />
+
+      {addToPlaylistSongId && (
+        <AddToPlaylistModal
+          visible={!!addToPlaylistSongId}
+          onClose={() => setAddToPlaylistSongId(null)}
+          songId={addToPlaylistSongId}
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: { flex: 1 },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  headerTitle: { fontSize: 28, fontWeight: "800" },
+  scanBtn: { padding: Spacing.sm },
+  genreScroll: { maxHeight: 44, marginBottom: Spacing.xs },
+  genreContent: { paddingHorizontal: Spacing.lg, gap: Spacing.xs },
+  genreChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    justifyContent: "center",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  genreText: { fontSize: 13, fontWeight: "600" },
+  sortBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.xs,
   },
+  songCount: { fontSize: 13 },
+  sortBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    padding: Spacing.xs,
+  },
+  sortLabel: { fontSize: 13, fontWeight: "600" },
+  listContent: { paddingBottom: 120 },
 });
