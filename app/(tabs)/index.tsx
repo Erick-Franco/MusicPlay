@@ -235,7 +235,10 @@ export default function LibraryScreen() {
             onToggleFavorite={() => toggleFavorite(item.id)}
           />
         )}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: insets.bottom + 100 }
+        ]}
         showsVerticalScrollIndicator={false}
       />
 

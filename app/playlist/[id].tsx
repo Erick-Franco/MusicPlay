@@ -190,7 +190,7 @@ export default function PlaylistDetailScreen() {
         </ScaleDecorator>
       );
     },
-    [currentSong, colors, playlistSongs, isFavorite, toggleFavorite, playSong],
+    [currentSong, colors, playlistSongs, isFavorite, toggleFavorite, playSong, handleSongMenu],
   );
 
   if (!playlist) {
@@ -284,21 +284,24 @@ export default function PlaylistDetailScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <DraggableFlatList
-            data={playlistSongs}
-            keyExtractor={(item) => item.id}
-            renderItem={renderSongItem}
-            onDragEnd={handleDragEnd}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            activationDistance={10}
-          />
+          <View style={{ flex: 1 }}>
+            <DraggableFlatList
+              data={playlistSongs}
+              keyExtractor={(item) => item.id}
+              renderItem={renderSongItem}
+              onDragEnd={handleDragEnd}
+              contentContainerStyle={[
+                styles.listContent,
+                { paddingBottom: insets.bottom + 100 }
+              ]}
+              showsVerticalScrollIndicator={false}
+              activationDistance={10}
+            />
+          </View>
         )}
 
         {/* MiniPlayer - Fixed at bottom */}
-        <View style={styles.miniPlayerContainer}>
-          <MiniPlayer />
-        </View>
+        {currentSong && <MiniPlayer />}
 
         {/* Add Songs Modal */}
         <AddSongsToPlaylistModal
@@ -406,11 +409,5 @@ const styles = StyleSheet.create({
   songArtist: { fontSize: 12 },
   songDuration: { fontSize: 12, marginRight: 2 },
   actionBtn: { padding: 4 },
-  listContent: { paddingBottom: 180 },
-  miniPlayerContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
+  listContent: { paddingBottom: 20 },
 });

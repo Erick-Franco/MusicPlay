@@ -211,7 +211,7 @@ export default function PlaylistsScreen() {
                 onDelete={() => handleDeletePlaylist(playlist)}
               />
             ))}
-            <View style={{ height: 120 }} />
+            <View style={{ height: 160 }} />
           </>
         )}
         showsVerticalScrollIndicator={false}

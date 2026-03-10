@@ -2,25 +2,26 @@ import { sampleSongs } from "@/data/songs";
 import { Playlist, RepeatMode, Song } from "@/types/types";
 import { pickAudioFiles, scanDeviceMusic } from "@/utils/musicScanner";
 import {
-    loadFavorites,
-    loadPlaylists,
-    loadRecents,
-    loadSettings,
-    saveFavorites,
-    savePlaylists,
-    saveRecents,
-    saveSettings,
+  loadFavorites,
+  loadPlaylists,
+  loadRecents,
+  loadSettings,
+  saveFavorites,
+  savePlaylists,
+  saveRecents,
+  saveSettings,
 } from "@/utils/storage";
 import { AudioModule, useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as MediaLibrary from "expo-media-library";
 import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
 } from "react";
+import { PermissionsAndroid, Platform } from "react-native";
 
 interface MusicPlayerState {
   songs: Song[];
@@ -132,9 +133,21 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        AudioModule.setAudioModeAsync({
+        // Request notification permission for Android 13+
+        if (Platform.OS === "android" && Platform.Version >= 33) {
+          try {
+            await PermissionsAndroid.request(
+              PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+            );
+          } catch (permErr) {
+            console.warn("Failed to request notification permission:", permErr);
+          }
+        }
+
+        await AudioModule.setAudioModeAsync({
           playsInSilentMode: true,
           shouldPlayInBackground: true,
+          interruptionModeAndroid: "pauseOthers",
           shouldRouteThroughEarpiece: false,
         });
 
@@ -171,6 +184,12 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Set up remote control listeners (Note: Next/Prev are not natively supported by expo-audio)
+  useEffect(() => {
+    // We keep play/pause listeners just in case expo-audio adds support later,
+    // though expo-audio currently manages play/pause natively without JS intervention.
+  }, []);
+
   // Handle song completion
   useEffect(() => {
     if (status.didJustFinish) {
@@ -204,7 +223,7 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
         }
       }
     }
-  }, [status.didJustFinish]);
+  }, [status.didJustFinish, player, loadAndPlay]);
 
   // === Library ===
   const loadDeviceMusic = useCallback(async () => {
@@ -255,6 +274,13 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
         }
 
         player.replace({ uri: song.audioUri });
+
+        // Setup lockscreen/notification controls
+        player.setActiveForLockScreen(true, {
+          title: song.title,
+          artist: song.artist,
+          albumTitle: song.album || "MusicPlay",
+        });
         player.volume = isMuted ? 0 : volume;
         player.play();
         setIsPlaying(true);
