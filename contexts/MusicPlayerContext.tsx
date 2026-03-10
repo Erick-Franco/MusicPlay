@@ -12,6 +12,7 @@ import {
     saveSettings,
 } from "@/utils/storage";
 import { AudioModule, useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import * as MediaLibrary from "expo-media-library";
 import React, {
     createContext,
     useCallback,
@@ -62,7 +63,13 @@ interface MusicPlayerActions {
   deletePlaylist: (playlistId: string) => void;
   addSongToPlaylist: (playlistId: string, songId: string) => void;
   removeSongFromPlaylist: (playlistId: string, songId: string) => void;
+  reorderPlaylistSong: (
+    playlistId: string,
+    fromIndex: number,
+    toIndex: number,
+  ) => void;
   playPlaylist: (playlist: Playlist) => Promise<void>;
+  deleteSongFromDevice: (songId: string) => Promise<void>;
   // New features
   setSleepTimer: (minutes: number) => void;
   cancelSleepTimer: () => void;
@@ -127,6 +134,7 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
       try {
         AudioModule.setAudioModeAsync({
           playsInSilentMode: true,
+          shouldPlayInBackground: true,
           shouldRouteThroughEarpiece: false,
         });
 
@@ -438,6 +446,23 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const reorderPlaylistSong = useCallback(
+    (playlistId: string, fromIndex: number, toIndex: number) => {
+      setPlaylists((prev) => {
+        const updated = prev.map((p) => {
+          if (p.id !== playlistId) return p;
+          const newSongIds = [...p.songIds];
+          const [moved] = newSongIds.splice(fromIndex, 1);
+          newSongIds.splice(toIndex, 0, moved);
+          return { ...p, songIds: newSongIds };
+        });
+        savePlaylists(updated);
+        return updated;
+      });
+    },
+    [],
+  );
+
   const playPlaylist = useCallback(
     async (playlist: Playlist) => {
       const playlistSongs = playlist.songIds
@@ -447,6 +472,57 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
         await playSong(playlistSongs[0], playlistSongs);
     },
     [songs, playSong],
+  );
+
+  const deleteSongFromDevice = useCallback(
+    async (songId: string) => {
+      const song = songs.find((s) => s.id === songId);
+      if (!song) return;
+      try {
+        // Stop playback if this song is playing
+        if (currentSong?.id === songId) {
+          player.pause();
+          setIsPlaying(false);
+          setCurrentSong(null);
+        }
+        // Try to delete the file via MediaLibrary
+        try {
+          await MediaLibrary.deleteAssetsAsync([songId]);
+        } catch (deleteErr) {
+          console.warn(
+            "MediaLibrary delete failed, removing from app only:",
+            deleteErr,
+          );
+        }
+        // Remove from songs list
+        setSongs((prev) => prev.filter((s) => s.id !== songId));
+        // Remove from all playlists
+        setPlaylists((prev) => {
+          const updated = prev.map((p) => ({
+            ...p,
+            songIds: p.songIds.filter((id) => id !== songId),
+          }));
+          savePlaylists(updated);
+          return updated;
+        });
+        // Remove from favorites
+        setFavoriteIds((prev) => {
+          const next = new Set(prev);
+          next.delete(songId);
+          saveFavorites(Array.from(next));
+          return next;
+        });
+        // Remove from recents
+        setRecentSongIds((prev) => {
+          const updated = prev.filter((id) => id !== songId);
+          saveRecents(updated);
+          return updated;
+        });
+      } catch (e) {
+        console.warn("Failed to delete song:", e);
+      }
+    },
+    [songs, currentSong, player],
   );
 
   // === Sleep Timer ===
@@ -530,7 +606,9 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
     deletePlaylist,
     addSongToPlaylist,
     removeSongFromPlaylist,
+    reorderPlaylistSong,
     playPlaylist,
+    deleteSongFromDevice,
     setSleepTimer,
     cancelSleepTimer,
     setEqualizerPreset,

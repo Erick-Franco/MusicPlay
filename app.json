@@ -45,9 +45,9 @@
           "image": "./assets/images/logomusic.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#0F0F1A",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#0F0F1A"
           }
         }
       ],
@@ -62,7 +62,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": false
+          "microphonePermission": false,
+          "enableBackgroundPlayback": true
         }
       ]
     ],

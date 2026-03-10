@@ -150,7 +150,9 @@ export default function NowPlayingScreen() {
       </View>
 
       {/* Controls */}
-      <PlayerControls size="large" />
+      <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+        <PlayerControls size="large" />
+      </View>
 
       {/* Sleep Timer Modal */}
       <SleepTimerModal
