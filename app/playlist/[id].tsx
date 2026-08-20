@@ -54,33 +54,36 @@ export default function PlaylistDetailScreen() {
     playSong(playlistSongs[randomIdx], playlistSongs);
   };
 
-  const handleSongMenu = (songId: string, songTitle: string) => {
-    Alert.alert(songTitle, "Opciones", [
-      {
-        text: "Quitar de la playlist",
-        onPress: () => removeSongFromPlaylist(playlist!.id, songId),
-      },
-      {
-        text: "Eliminar del dispositivo",
-        style: "destructive",
-        onPress: () => {
-          Alert.alert(
-            "Eliminar del dispositivo",
-            `¿Estás seguro de eliminar "${songTitle}" permanentemente? Esta acción no se puede deshacer.`,
-            [
-              { text: "Cancelar", style: "cancel" },
-              {
-                text: "Eliminar",
-                style: "destructive",
-                onPress: () => deleteSongFromDevice(songId),
-              },
-            ],
-          );
+  const handleSongMenu = useCallback(
+    (songId: string, songTitle: string) => {
+      Alert.alert(songTitle, "Opciones", [
+        {
+          text: "Quitar de la playlist",
+          onPress: () => removeSongFromPlaylist(playlist!.id, songId),
         },
-      },
-      { text: "Cancelar", style: "cancel" },
-    ]);
-  };
+        {
+          text: "Eliminar de la biblioteca",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Eliminar de la biblioteca",
+              `Se quitará "${songTitle}" de la biblioteca, playlists, favoritos y recientes. Si la canción fue agregada manualmente, el archivo original permanecerá en tu dispositivo.`,
+              [
+                { text: "Cancelar", style: "cancel" },
+                {
+                  text: "Eliminar",
+                  style: "destructive",
+                  onPress: () => deleteSongFromDevice(songId),
+                },
+              ],
+            );
+          },
+        },
+        { text: "Cancelar", style: "cancel" },
+      ]);
+    },
+    [playlist, removeSongFromPlaylist, deleteSongFromDevice],
+  );
 
   const handleDragEnd = useCallback(
     ({ data, from, to }: { data: Song[]; from: number; to: number }) => {

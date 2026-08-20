@@ -26,10 +26,9 @@ export default function PlaylistsScreen() {
     playlists,
     songs,
     recentSongIds,
-    favoriteIds,
+    playCounts,
     createPlaylist,
     deletePlaylist,
-    playSong,
   } = useMusicPlayer();
   const [showCreate, setShowCreate] = useState(false);
 
@@ -54,13 +53,9 @@ export default function PlaylistsScreen() {
       });
     }
 
-    // Most played  (based on frequency in recents)
-    if (recentSongIds.length > 5) {
-      const freq: Record<string, number> = {};
-      recentSongIds.forEach((id) => {
-        freq[id] = (freq[id] || 0) + 1;
-      });
-      const mostPlayed = Object.entries(freq)
+    // Most played  (based on persistent play counts)
+    if (Object.keys(playCounts).length > 0) {
+      const mostPlayed = Object.entries(playCounts)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 20)
         .map(([id]) => id);
@@ -88,7 +83,7 @@ export default function PlaylistsScreen() {
     }
 
     return smart;
-  }, [recentSongIds, favoriteIds, songs]);
+  }, [recentSongIds, playCounts, songs]);
 
   const handleOpenSmart = (smartPlaylist: (typeof smartPlaylists)[0]) => {
     router.push(`/smart-playlist/${smartPlaylist.id}` as any);

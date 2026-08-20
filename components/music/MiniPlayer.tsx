@@ -1,10 +1,19 @@
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
-import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
+import {
+  useMusicPlayer,
+  usePlaybackStatus,
+} from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export function MiniPlayer() {
@@ -12,8 +21,9 @@ export function MiniPlayer() {
   const colors = Colors[colorScheme];
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { currentSong, isPlaying, togglePlayPause, next, position, duration } =
+  const { currentSong, isPlaying, togglePlayPause, next, previous } =
     useMusicPlayer();
+  const { position, duration } = usePlaybackStatus();
 
   if (!currentSong) return null;
 
@@ -44,9 +54,16 @@ export function MiniPlayer() {
 
       <View style={styles.content}>
         {/* Artwork */}
-        <View style={[styles.artwork, { backgroundColor: colors.card }]}>
-          <Ionicons name="musical-note" size={18} color={colors.accent} />
-        </View>
+        {currentSong.artwork ? (
+          <Image
+            source={{ uri: currentSong.artwork }}
+            style={[styles.artwork, { backgroundColor: colors.card }]}
+          />
+        ) : (
+          <View style={[styles.artwork, { backgroundColor: colors.card }]}>
+            <Ionicons name="musical-note" size={18} color={colors.accent} />
+          </View>
+        )}
 
         {/* Song info */}
         <View style={styles.info}>
@@ -65,16 +82,29 @@ export function MiniPlayer() {
         </View>
 
         {/* Controls */}
-        <TouchableOpacity onPress={togglePlayPause} style={styles.controlBtn}>
-          <Ionicons
-            name={isPlaying ? "pause" : "play"}
-            size={26}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={next} style={styles.controlBtn}>
-          <Ionicons name="play-forward" size={22} color={colors.text} />
-        </TouchableOpacity>
+        <View style={styles.controls}>
+          <TouchableOpacity onPress={previous} style={styles.controlBtn}>
+            <Ionicons
+              name="play-skip-back"
+              size={22}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={togglePlayPause} style={styles.controlBtn}>
+            <Ionicons
+              name={isPlaying ? "pause" : "play"}
+              size={26}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={next} style={styles.controlBtn}>
+            <Ionicons
+              name="play-skip-forward"
+              size={22}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -120,5 +150,9 @@ const styles = StyleSheet.create({
   },
   controlBtn: {
     padding: Spacing.xs,
+  },
+  controls: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 });

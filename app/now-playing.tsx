@@ -1,6 +1,7 @@
 import { PlayerControls } from "@/components/music/PlayerControls";
 import { ProgressBar } from "@/components/music/ProgressBar";
 import { SleepTimerModal } from "@/components/music/SleepTimerModal";
+import { SpeedControl } from "@/components/music/SpeedControl";
 import { VolumeControl } from "@/components/music/VolumeControl";
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
@@ -72,12 +73,6 @@ export default function NowPlayingScreen() {
           >
             <Ionicons name="list" size={22} color={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push("/equalizer" as any)}
-            style={styles.headerBtn}
-          >
-            <Ionicons name="options-outline" size={22} color={colors.text} />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -113,6 +108,7 @@ export default function NowPlayingScreen() {
             </Text>
           </View>
           <View style={styles.actionBtns}>
+            <SpeedControl />
             <TouchableOpacity onPress={() => toggleFavorite(currentSong.id)}>
               <Ionicons
                 name={isFavorite(currentSong.id) ? "heart" : "heart-outline"}

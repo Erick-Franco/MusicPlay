@@ -1,5 +1,8 @@
 import { Colors, Spacing } from "@/constants/theme";
-import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
+import {
+  useMusicPlayer,
+  usePlaybackStatus,
+} from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { formatDuration } from "@/utils/musicScanner";
 import Slider from "@react-native-community/slider";
@@ -9,7 +12,8 @@ import { StyleSheet, Text, View } from "react-native";
 export function ProgressBar() {
   const colorScheme = useColorScheme() ?? "dark";
   const colors = Colors[colorScheme];
-  const { position, duration, seekTo } = useMusicPlayer();
+  const { seekTo } = useMusicPlayer();
+  const { position, duration } = usePlaybackStatus();
 
   const onSlidingComplete = useCallback(
     (value: number) => {

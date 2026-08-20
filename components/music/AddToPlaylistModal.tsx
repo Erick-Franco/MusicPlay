@@ -26,9 +26,12 @@ export function AddToPlaylistModal({
 }: AddToPlaylistModalProps) {
   const colorScheme = useColorScheme() ?? "dark";
   const colors = Colors[colorScheme];
-  const { playlists, addSongToPlaylist, createPlaylist } = useMusicPlayer();
+  const { playlists, songs, addSongToPlaylist, createPlaylist, playNext } =
+    useMusicPlayer();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
+
+  const song = songs.find((s) => s.id === songId);
 
   const handleSelect = (playlistId: string) => {
     addSongToPlaylist(playlistId, songId);
@@ -37,12 +40,8 @@ export function AddToPlaylistModal({
 
   const handleCreateAndAdd = () => {
     if (newName.trim()) {
-      const id = Date.now().toString();
-      createPlaylist(newName.trim());
-      // Find newly created playlist and add song
-      setTimeout(() => {
-        addSongToPlaylist(id, songId);
-      }, 100);
+      const id = createPlaylist(newName.trim());
+      addSongToPlaylist(id, songId);
       setNewName("");
       setShowCreate(false);
       onClose();
@@ -111,19 +110,43 @@ export function AddToPlaylistModal({
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity
-              style={[styles.createBtn, { borderBottomColor: colors.border }]}
-              onPress={() => setShowCreate(true)}
-            >
-              <View
-                style={[styles.createIcon, { backgroundColor: colors.accent }]}
+            <>
+              <TouchableOpacity
+                style={[styles.createBtn, { borderBottomColor: colors.border }]}
+                onPress={() => setShowCreate(true)}
               >
-                <Ionicons name="add" size={18} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.createText, { color: colors.accent }]}>
-                Crear nueva playlist
-              </Text>
-            </TouchableOpacity>
+                <View
+                  style={[styles.createIcon, { backgroundColor: colors.accent }]}
+                >
+                  <Ionicons name="add" size={18} color="#FFFFFF" />
+                </View>
+                <Text style={[styles.createText, { color: colors.accent }]}>
+                  Crear nueva playlist
+                </Text>
+              </TouchableOpacity>
+
+              {song && (
+                <TouchableOpacity
+                  style={[styles.createBtn, { borderBottomColor: colors.border }]}
+                  onPress={() => {
+                    playNext(song);
+                    onClose();
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.createIcon,
+                      { backgroundColor: colors.card, borderColor: colors.border },
+                    ]}
+                  >
+                    <Ionicons name="play" size={18} color={colors.accent} />
+                  </View>
+                  <Text style={[styles.createText, { color: colors.text }]}>
+                    Reproducir a continuación
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
 
           {playlists.length === 0 && !showCreate ? (
@@ -215,6 +238,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
   },
   createText: { fontSize: 15, fontWeight: "600" },
   createRow: {

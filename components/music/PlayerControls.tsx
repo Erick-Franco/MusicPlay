@@ -4,7 +4,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { RepeatMode } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface PlayerControlsProps {
   size?: "small" | "large";
@@ -28,17 +28,6 @@ export function PlayerControls({ size = "large" }: PlayerControlsProps) {
   const mainIconSize = isLarge ? 38 : 28;
   const sideIconSize = isLarge ? 28 : 22;
   const modeIconSize = isLarge ? 22 : 18;
-
-  const getRepeatIcon = (): keyof typeof Ionicons.glyphMap => {
-    switch (repeatMode) {
-      case RepeatMode.ONE:
-        return "repeat";
-      case RepeatMode.ALL:
-        return "repeat";
-      default:
-        return "repeat";
-    }
-  };
 
   return (
     <View style={[styles.container, isLarge && styles.containerLarge]}>
@@ -86,7 +75,7 @@ export function PlayerControls({ size = "large" }: PlayerControlsProps) {
       <TouchableOpacity onPress={cycleRepeatMode} style={styles.modeBtn}>
         <View>
           <Ionicons
-            name={getRepeatIcon()}
+            name="repeat"
             size={modeIconSize}
             color={
               repeatMode !== RepeatMode.OFF
@@ -101,7 +90,7 @@ export function PlayerControls({ size = "large" }: PlayerControlsProps) {
                 { backgroundColor: colors.accent },
               ]}
             >
-              <Ionicons name="text" size={8} color="#FFFFFF" />
+              <Text style={styles.repeatOneText}>1</Text>
             </View>
           )}
         </View>
@@ -149,4 +138,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  repeatOneText: { fontSize: 9, fontWeight: "800", color: "#FFFFFF" },
 });

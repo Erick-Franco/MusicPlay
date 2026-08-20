@@ -4,14 +4,21 @@ import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function FavoritesScreen() {
   const colorScheme = useColorScheme() ?? "dark";
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
-  const { songs, currentSong, playSong, favoriteIds } = useMusicPlayer();
+  const { songs, currentSong, playSong, favoriteIds, shufflePlay } =
+    useMusicPlayer();
 
   const favoriteSongs = useMemo(() => {
     return songs.filter((s) => favoriteIds.has(s.id));
@@ -24,7 +31,28 @@ export default function FavoritesScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Favoritos
         </Text>
-        <Ionicons name="heart" size={24} color={colors.favorite} />
+        <View style={styles.headerActions}>
+          <Text style={[styles.count, { color: colors.textSecondary }]}>
+            {favoriteSongs.length}
+          </Text>
+          <TouchableOpacity
+            onPress={() => shufflePlay(favoriteSongs)}
+            disabled={favoriteSongs.length === 0}
+            style={styles.shuffleBtn}
+            accessibilityLabel="Reproducir favoritos en aleatorio"
+          >
+            <Ionicons
+              name="shuffle"
+              size={22}
+              color={
+                favoriteSongs.length > 0
+                  ? colors.accent
+                  : colors.textSecondary
+              }
+            />
+          </TouchableOpacity>
+          <Ionicons name="heart" size={24} color={colors.favorite} />
+        </View>
       </View>
 
       {favoriteSongs.length === 0 ? (
@@ -70,6 +98,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.lg,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  count: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  shuffleBtn: {
+    padding: Spacing.xs,
   },
   headerTitle: {
     fontSize: 28,

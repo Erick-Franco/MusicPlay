@@ -6,12 +6,14 @@ const KEYS = {
   FAVORITES: "@musicplay/favorites",
   SETTINGS: "@musicplay/settings",
   RECENTS: "@musicplay/recents",
+  PLAY_COUNTS: "@musicplay/play-counts",
 };
 
 interface Settings {
   volume: number;
   lastSongId: string | null;
-  equalizerPreset?: string;
+  lastPosition?: number;
+  playbackRate?: number;
 }
 
 // Playlists
@@ -43,7 +45,19 @@ export async function loadSettings(): Promise<Settings> {
   const data = await AsyncStorage.getItem(KEYS.SETTINGS);
   return data
     ? JSON.parse(data)
-    : { volume: 1.0, lastSongId: null, equalizerPreset: "Normal" };
+    : { volume: 1.0, lastSongId: null, lastPosition: 0, playbackRate: 1 };
+}
+
+// Play counts
+export async function savePlayCounts(
+  counts: Record<string, number>,
+): Promise<void> {
+  await AsyncStorage.setItem(KEYS.PLAY_COUNTS, JSON.stringify(counts));
+}
+
+export async function loadPlayCounts(): Promise<Record<string, number>> {
+  const data = await AsyncStorage.getItem(KEYS.PLAY_COUNTS);
+  return data ? JSON.parse(data) : {};
 }
 
 // Recents

@@ -8,6 +8,7 @@ import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
 import { MusicPlayerProvider } from "@/contexts/MusicPlayerContext";
+import { UndoBanner } from "@/components/music/UndoBanner";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export const unstable_settings = {
@@ -43,19 +44,16 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
-            name="equalizer"
-            options={{
-              presentation: "modal",
-              headerShown: false,
-              animation: "slide_from_bottom",
-            }}
+            name="smart-playlist/[type]"
+            options={{ headerShown: false, animation: "slide_from_right" }}
           />
           <Stack.Screen
-            name="smart-playlist/[type]"
+            name="stats"
             options={{ headerShown: false, animation: "slide_from_right" }}
           />
         </Stack>
         <StatusBar style="auto" />
+        <UndoBanner />
       </ThemeProvider>
     </MusicPlayerProvider>
   );

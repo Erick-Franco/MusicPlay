@@ -1,50 +1,66 @@
-# Welcome to your Expo app 👋
+# MusicPlay
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Reproductor de música local para Android construido con **React Native + Expo (SDK 54)**, TypeScript y `expo-audio`.
 
-## Get started
+## Características
 
-1. Install dependencies
+- **Biblioteca**: escaneo de audio del dispositivo (`expo-media-library`) y selección manual de archivos (`expo-document-picker`).
+- **Reproducción**: play/pause, anterior/siguiente, búsqueda dentro de la canción (seek), volumen y silencio.
+- **Modos**: aleatorio (shuffle) y repetición (una / todas).
+- **Favoritos**: marca canciones con corazón, persistidas localmente.
+- **Playlists**: crear, eliminar, agregar/quitar canciones y reordenar con arrastre (`react-native-draggable-flatlist`).
+- **Playlists inteligentes**: reproducidas recientemente, más escuchadas (contador persistente de reproducciones) y agregadas recientemente.
+- **Temporizador de sueño**: detiene la reproducción al cumplirse el tiempo.
+- **Mini player y Now Playing**: controles rápidos y pantalla de reproducción con carátula y progreso.
+- **Reproducción en segundo plano** con controles en la pantalla de bloqueo (Android).
+- **Tema claro/oscuro** automático.
 
-   ```bash
-   npm install
-   ```
+## Requisitos
 
-2. Start the app
+- Node.js 20+ y npm.
+- [Expo CLI](https://docs.expo.dev/) / Android Studio o dispositivo físico para correr la app.
+- La reproducción en segundo plano y el escaneo de medios requieren un **development build** (no funciona en Expo Go para estas APIs de media).
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Puesta en marcha
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Desde la salida de `expo start` puedes abrir la app en un emulador Android o escaneando el código QR con Expo Go (limitado). Para un build completo:
 
-## Learn more
+```bash
+npx expo run:android          # development build
+npm run lint                  # eslint
+npx tsc --noEmit              # typecheck
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## Estructura
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```
+app/                     Rutas con expo-router
+  (tabs)/                Pantallas de la barra inferior (Biblioteca, Recientes, Playlists, Favoritos)
+  playlist/[id].tsx      Detalle de playlist
+  smart-playlist/[type].tsx  Playlists inteligentes
+  now-playing.tsx        Pantalla de reproducción
+  queue.tsx              Cola de reproducción
+components/music/        Componentes del reproductor (MiniPlayer, PlayerControls, SongItem, modales…)
+contexts/MusicPlayerContext.tsx  Estado global del reproductor + contexto de estado de reproducción
+utils/musicScanner.ts    Escaneo de dispositivos y picker de archivos
+utils/storage.ts         Persistencia con AsyncStorage
+data/songs.ts            Canciones de ejemplo para desarrollo
+constants/theme.ts       Paleta y spacing
+```
 
-## Join the community
+## Persistencia
 
-Join our community of developers creating universal apps.
+Todo se guarda con AsyncStorage bajo la clave `@musicplay/*`: playlists, favoritos, ajustes (volumen), recientes y contadores de reproducción.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Permisos (Android)
+
+La app solicita únicamente: acceso a audio (`READ_MEDIA_AUDIO`), notificaciones (`POST_NOTIFICATIONS`) y servicio en primer plano para reproducción en segundo plano.
+
+## Nota
+
+El ecualizador fue eliminado porque `expo-audio` no expone una API de ecualización; un EQ real requeriría un módulo nativo adicional (por ejemplo, `react-native-track-player`).

@@ -33,6 +33,7 @@ export default function SmartPlaylistScreen() {
     songs,
     recentSongIds,
     favoriteIds,
+    playCounts,
     currentSong,
     playSong,
     toggleShuffle,
@@ -55,11 +56,7 @@ export default function SmartPlaylistScreen() {
         break;
       case "most_played": {
         title = "Más escuchadas";
-        const freq: Record<string, number> = {};
-        recentSongIds.forEach((id) => {
-          freq[id] = (freq[id] || 0) + 1;
-        });
-        songIds = Object.entries(freq)
+        songIds = Object.entries(playCounts)
           .sort(([, a], [, b]) => b - a)
           .slice(0, 20)
           .map(([id]) => id);
@@ -85,7 +82,7 @@ export default function SmartPlaylistScreen() {
       .filter((s): s is Song => s !== undefined);
 
     return { title, smartSongs };
-  }, [type, songs, recentSongIds, favoriteIds]);
+  }, [type, songs, recentSongIds, favoriteIds, playCounts]);
 
   const handlePlayAll = () => {
     if (smartSongs.length > 0) playSong(smartSongs[0], smartSongs);

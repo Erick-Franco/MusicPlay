@@ -6,11 +6,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -19,12 +20,36 @@ export default function QueueScreen() {
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { queue, queueIndex, currentSong, playSong, isShuffleOn } =
-    useMusicPlayer();
+  const {
+    queue,
+    queueIndex,
+    currentSong,
+    playSong,
+    isShuffleOn,
+    removeFromQueue,
+    clearQueue,
+  } = useMusicPlayer();
 
-  // Get upcoming songs - if shuffle is on, show all remaining songs (order is random)
-  const upcomingSongs = queue.filter((_, idx) => idx !== queueIndex);
-  const nextInOrder = queue.slice(queueIndex + 1);
+  // Upcoming songs: everything in the queue except the one playing now.
+  // In shuffle mode the order shown is the current (randomized) queue order.
+  const upcoming = queue
+    .map((song, index) => ({ song, index }))
+    .filter(({ index }) => index !== queueIndex);
+
+  const handleClearQueue = () => {
+    Alert.alert(
+      "Vaciar cola",
+      "Se eliminarán todas las canciones en espera. La canción actual seguirá sonando.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Vaciar",
+          style: "destructive",
+          onPress: clearQueue,
+        },
+      ],
+    );
+  };
 
   return (
     <View
@@ -41,7 +66,15 @@ export default function QueueScreen() {
         <Text style={[styles.title, { color: colors.text }]}>
           Cola de reproducción
         </Text>
-        <View style={{ width: 36 }} />
+        {upcoming.length > 0 ? (
+          <TouchableOpacity onPress={handleClearQueue} style={styles.clearBtn}>
+            <Text style={[styles.clearText, { color: colors.danger }]}>
+              Vaciar
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 36 }} />
+        )}
       </View>
 
       {queue.length === 0 ? (
@@ -70,7 +103,7 @@ export default function QueueScreen() {
               </Text>
               <SongItem
                 song={currentSong}
-                isActive={true}
+                isActive
                 onPress={() => {}}
                 showFavorite={false}
               />
@@ -78,54 +111,68 @@ export default function QueueScreen() {
           )}
 
           {/* Up next */}
-          {isShuffleOn
-            ? // Shuffle mode: show all remaining songs with shuffle indicator
-              upcomingSongs.length > 0 && (
-                <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <Text
-                      style={[
-                        styles.sectionTitle,
-                        { color: colors.textSecondary },
-                      ]}
-                    >
-                      Modo aleatorio ({upcomingSongs.length} canciones)
-                    </Text>
-                    <Ionicons name="shuffle" size={16} color={colors.accent} />
-                  </View>
-                  {upcomingSongs.map((song) => (
-                    <SongItem
-                      key={song.id}
-                      song={song}
-                      isActive={false}
-                      onPress={() => playSong(song, queue)}
-                      showFavorite={false}
-                    />
-                  ))}
-                </View>
-              )
-            : // Normal mode: show remaining songs in order
-              nextInOrder.length > 0 && (
-                <View style={styles.section}>
-                  <Text
-                    style={[
-                      styles.sectionTitle,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    Siguiente ({nextInOrder.length} canciones)
-                  </Text>
-                  {nextInOrder.map((song) => (
-                    <SongItem
-                      key={song.id}
-                      song={song}
-                      isActive={false}
-                      onPress={() => playSong(song, queue)}
-                      showFavorite={false}
-                    />
-                  ))}
-                </View>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text
+                style={[styles.sectionTitle, { color: colors.textSecondary }]}
+              >
+                {isShuffleOn
+                  ? `Modo aleatorio (${upcoming.length} canciones)`
+                  : `Siguiente (${upcoming.length} canciones)`}
+              </Text>
+              {isShuffleOn && (
+                <Ionicons name="shuffle" size={16} color={colors.accent} />
               )}
+            </View>
+            {upcoming.length === 0 ? (
+              <Text
+                style={[
+                  styles.emptyUpcoming,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                No hay más canciones en la cola
+              </Text>
+            ) : (
+              upcoming.map(({ song, index }) => (
+                <View
+                  key={`${song.id}-${index}`}
+                  style={[styles.row, { borderBottomColor: colors.border }]}
+                >
+                  <TouchableOpacity
+                    style={styles.rowMain}
+                    onPress={() => playSong(song, queue)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[styles.rowTitle, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
+                      {song.title}
+                    </Text>
+                    <Text
+                      style={[styles.rowSub, { color: colors.textSecondary }]}
+                      numberOfLines={1}
+                    >
+                      {song.artist}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => removeFromQueue(index)}
+                    style={styles.removeBtn}
+                    hitSlop={10}
+                    accessibilityLabel="Quitar de la cola"
+                  >
+                    <Ionicons
+                      name="close"
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </View>
         </ScrollView>
       )}
     </View>
@@ -143,6 +190,8 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: Spacing.sm },
   title: { fontSize: 17, fontWeight: "700" },
+  clearBtn: { padding: Spacing.sm },
+  clearText: { fontSize: 14, fontWeight: "600" },
   empty: {
     flex: 1,
     alignItems: "center",
@@ -151,6 +200,11 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   emptyText: { fontSize: 16 },
+  emptyUpcoming: {
+    fontSize: 13,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
   listContent: { paddingBottom: 100 },
   section: { marginTop: Spacing.md },
   sectionHeader: {
@@ -168,4 +222,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
   },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: Spacing.lg,
+    paddingRight: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  rowMain: { flex: 1, paddingRight: Spacing.md },
+  rowTitle: { fontSize: 15, fontWeight: "600" },
+  rowSub: { fontSize: 13, marginTop: 2 },
+  removeBtn: { padding: Spacing.xs },
 });

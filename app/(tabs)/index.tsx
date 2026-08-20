@@ -4,8 +4,9 @@ import { SongItem } from "@/components/music/SongItem";
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { SortBy } from "@/types/types";
+import { SortBy, type Song } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,10 +20,18 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+type ViewMode = "songs" | "albums" | "artists";
+
+interface GroupEntry {
+  name: string;
+  items: Song[];
+}
+
 export default function LibraryScreen() {
   const colorScheme = useColorScheme() ?? "dark";
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const {
     songs,
     currentSong,
@@ -42,6 +51,10 @@ export default function LibraryScreen() {
     null,
   );
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("songs");
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+
+  const q = search.trim().toLowerCase();
 
   const genres = useMemo(() => {
     const genreSet = new Set<string>();
@@ -54,8 +67,7 @@ export default function LibraryScreen() {
   const filteredSongs = useMemo(() => {
     let result = [...songs];
     if (selectedGenre) result = result.filter((s) => s.genre === selectedGenre);
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    if (q) {
       result = result.filter(
         (s) =>
           s.title.toLowerCase().includes(q) ||
@@ -74,7 +86,65 @@ export default function LibraryScreen() {
       }
     });
     return result;
-  }, [songs, search, sortBy, selectedGenre]);
+  }, [songs, q, sortBy, selectedGenre]);
+
+  const groupBy = useCallback(
+    (getKey: (s: Song) => string): GroupEntry[] => {
+      const map = new Map<string, Song[]>();
+      songs.forEach((s) => {
+        const key = getKey(s);
+        const arr = map.get(key) ?? [];
+        arr.push(s);
+        map.set(key, arr);
+      });
+      return Array.from(map.entries())
+        .map(([name, items]) => ({ name, items }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+    [songs],
+  );
+
+  const albums = useMemo(
+    () => groupBy((s) => s.album || "Álbum desconocido"),
+    [groupBy],
+  );
+  const artists = useMemo(
+    () => groupBy((s) => s.artist || "Artista desconocido"),
+    [groupBy],
+  );
+
+  const filteredAlbums = useMemo(
+    () =>
+      q ? albums.filter((a) => a.name.toLowerCase().includes(q)) : albums,
+    [albums, q],
+  );
+  const filteredArtists = useMemo(
+    () =>
+      q ? artists.filter((a) => a.name.toLowerCase().includes(q)) : artists,
+    [artists, q],
+  );
+
+  const selectedGroupSongs = useMemo(() => {
+    if (!selectedGroup) return [] as Song[];
+    const source = viewMode === "albums" ? albums : artists;
+    const group = source.find((g) => g.name === selectedGroup);
+    if (!group) return [] as Song[];
+    let result = [...group.items];
+    if (q) {
+      result = result.filter(
+        (s) =>
+          s.title.toLowerCase().includes(q) ||
+          s.artist.toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [selectedGroup, viewMode, albums, artists, q]);
+
+  const handleSwitchMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    setSelectedGroup(null);
+    setSelectedGenre(null);
+  };
 
   const cycleSortBy = useCallback(() => {
     setSortBy((prev) => {
@@ -107,8 +177,50 @@ export default function LibraryScreen() {
     }
   };
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+  const renderSongItem = ({ item }: { item: Song }) => (
+    <SongItem
+      song={item}
+      isActive={currentSong?.id === item.id}
+      onPress={() =>
+        playSong(item, selectedGroup ? selectedGroupSongs : filteredSongs)
+      }
+      onLongPress={() => setAddToPlaylistSongId(item.id)}
+      showFavorite
+      isFavorite={isFavorite(item.id)}
+      onToggleFavorite={() => toggleFavorite(item.id)}
+    />
+  );
+
+  const renderGroupItem = ({ item }: { item: GroupEntry }) => (
+    <TouchableOpacity
+      style={[styles.groupRow, { borderBottomColor: colors.border }]}
+      onPress={() => setSelectedGroup(item.name)}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.groupIcon, { backgroundColor: colors.card }]}>
+        <Ionicons
+          name={viewMode === "albums" ? "disc-outline" : "person-outline"}
+          size={20}
+          color={colors.accent}
+        />
+      </View>
+      <View style={styles.groupInfo}>
+        <Text
+          style={[styles.groupName, { color: colors.text }]}
+          numberOfLines={1}
+        >
+          {item.name}
+        </Text>
+        <Text style={[styles.groupCount, { color: colors.textSecondary }]}>
+          {item.items.length} canciones
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+    </TouchableOpacity>
+  );
+
+  const header = (
+    <View>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <View style={styles.headerLeft}>
@@ -120,7 +232,14 @@ export default function LibraryScreen() {
             MusicPlay
           </Text>
         </View>
-        <View style={{ flexDirection: "row", gap: Spacing.sm }}>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={() => router.push("/stats")}
+            style={styles.iconBtn}
+            accessibilityLabel="Estadísticas"
+          >
+            <Ionicons name="bar-chart" size={20} color={colors.text} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={pickMusicFiles} style={styles.iconBtn}>
             <Ionicons
               name="folder-open-outline"
@@ -145,102 +264,196 @@ export default function LibraryScreen() {
       {/* Search */}
       <SearchBar value={search} onChangeText={setSearch} />
 
-      {/* Genre chips */}
-      {genres.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.genreScroll}
-          contentContainerStyle={styles.genreContent}
-        >
+      {/* View mode segmented control */}
+      <View style={styles.segmentRow}>
+        {(
+          [
+            { key: "songs", label: "Canciones" },
+            { key: "albums", label: "Álbumes" },
+            { key: "artists", label: "Artistas" },
+          ] as const
+        ).map((mode) => (
           <TouchableOpacity
+            key={mode.key}
+            onPress={() => handleSwitchMode(mode.key)}
             style={[
-              styles.genreChip,
-              { backgroundColor: !selectedGenre ? colors.accent : colors.card },
+              styles.segmentBtn,
+              {
+                backgroundColor:
+                  viewMode === mode.key ? colors.accent : colors.card,
+              },
             ]}
-            onPress={() => setSelectedGenre(null)}
           >
             <Text
               style={[
-                styles.genreText,
-                { color: !selectedGenre ? "#FFF" : colors.text },
-              ]}
-            >
-              Todos
-            </Text>
-          </TouchableOpacity>
-          {genres.map((genre) => (
-            <TouchableOpacity
-              key={genre}
-              style={[
-                styles.genreChip,
+                styles.segmentText,
                 {
-                  backgroundColor:
-                    selectedGenre === genre ? colors.accent : colors.card,
+                  color:
+                    viewMode === mode.key ? "#FFFFFF" : colors.textSecondary,
                 },
               ]}
-              onPress={() =>
-                setSelectedGenre(selectedGenre === genre ? null : genre)
-              }
             >
-              <Text
-                style={[
-                  styles.genreText,
-                  { color: selectedGenre === genre ? "#FFF" : colors.text },
-                ]}
-              >
-                {genre}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-
-      {/* Sort + Shuffle controls */}
-      <View style={styles.sortBar}>
-        <Text style={[styles.songCount, { color: colors.textSecondary }]}>
-          {filteredSongs.length} canciones
-        </Text>
-        <View style={styles.sortActions}>
-          <TouchableOpacity
-            onPress={handleShuffleAll}
-            style={styles.shuffleAllBtn}
-          >
-            <Ionicons name="shuffle" size={16} color={colors.accent} />
-            <Text style={[styles.sortLabel, { color: colors.accent }]}>
-              Aleatorio
+              {mode.label}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={cycleSortBy} style={styles.sortBtn}>
-            <Ionicons name="swap-vertical" size={16} color={colors.accent} />
-            <Text style={[styles.sortLabel, { color: colors.accent }]}>
-              {getSortLabel()}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        ))}
       </View>
 
-      {/* Song list */}
-      <FlatList
-        data={filteredSongs}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <SongItem
-            song={item}
-            isActive={currentSong?.id === item.id}
-            onPress={() => playSong(item, filteredSongs)}
-            onLongPress={() => setAddToPlaylistSongId(item.id)}
-            showFavorite
-            isFavorite={isFavorite(item.id)}
-            onToggleFavorite={() => toggleFavorite(item.id)}
-          />
-        )}
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: insets.bottom + 100 }
-        ]}
-        showsVerticalScrollIndicator={false}
-      />
+      {/* Group detail header */}
+      {selectedGroup ? (
+        <TouchableOpacity
+          style={styles.groupBack}
+          onPress={() => {
+            setSelectedGroup(null);
+            setSearch("");
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.text} />
+          <Text
+            style={[styles.groupBackText, { color: colors.text }]}
+            numberOfLines={1}
+          >
+            {selectedGroup}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <>
+          {/* Genre chips */}
+          {viewMode === "songs" && genres.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.genreScroll}
+              contentContainerStyle={styles.genreContent}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.genreChip,
+                  {
+                    backgroundColor: !selectedGenre
+                      ? colors.accent
+                      : colors.card,
+                  },
+                ]}
+                onPress={() => setSelectedGenre(null)}
+              >
+                <Text
+                  style={[
+                    styles.genreText,
+                    { color: !selectedGenre ? "#FFF" : colors.text },
+                  ]}
+                >
+                  Todos
+                </Text>
+              </TouchableOpacity>
+              {genres.map((genre) => (
+                <TouchableOpacity
+                  key={genre}
+                  style={[
+                    styles.genreChip,
+                    {
+                      backgroundColor:
+                        selectedGenre === genre ? colors.accent : colors.card,
+                    },
+                  ]}
+                  onPress={() =>
+                    setSelectedGenre(selectedGenre === genre ? null : genre)
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.genreText,
+                      {
+                        color: selectedGenre === genre ? "#FFF" : colors.text,
+                      },
+                    ]}
+                  >
+                    {genre}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* Sort + Shuffle controls (songs mode) */}
+          {viewMode === "songs" && (
+            <View style={styles.sortBar}>
+              <Text style={[styles.songCount, { color: colors.textSecondary }]}>
+                {filteredSongs.length} canciones
+              </Text>
+              <View style={styles.sortActions}>
+                <TouchableOpacity
+                  onPress={handleShuffleAll}
+                  style={styles.shuffleAllBtn}
+                >
+                  <Ionicons name="shuffle" size={16} color={colors.accent} />
+                  <Text style={[styles.sortLabel, { color: colors.accent }]}>
+                    Aleatorio
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={cycleSortBy} style={styles.sortBtn}>
+                  <Ionicons
+                    name="swap-vertical"
+                    size={16}
+                    color={colors.accent}
+                  />
+                  <Text style={[styles.sortLabel, { color: colors.accent }]}>
+                    {getSortLabel()}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </>
+      )}
+    </View>
+  );
+
+  const listContentStyle = [
+    styles.listContent,
+    { paddingBottom: insets.bottom + 100 },
+  ];
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {selectedGroup ? (
+        <FlatList
+          data={selectedGroupSongs}
+          keyExtractor={(item) => item.id}
+          renderItem={renderSongItem}
+          ListHeaderComponent={header}
+          contentContainerStyle={listContentStyle}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : viewMode === "songs" ? (
+        <FlatList
+          data={filteredSongs}
+          keyExtractor={(item) => item.id}
+          renderItem={renderSongItem}
+          ListHeaderComponent={header}
+          contentContainerStyle={listContentStyle}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : viewMode === "albums" ? (
+        <FlatList
+          data={filteredAlbums}
+          keyExtractor={(item) => item.name}
+          renderItem={renderGroupItem}
+          ListHeaderComponent={header}
+          contentContainerStyle={listContentStyle}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <FlatList
+          data={filteredArtists}
+          keyExtractor={(item) => item.name}
+          renderItem={renderGroupItem}
+          ListHeaderComponent={header}
+          contentContainerStyle={listContentStyle}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       {addToPlaylistSongId && (
         <AddToPlaylistModal
@@ -265,7 +478,29 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
   logo: { width: 32, height: 32, borderRadius: 8 },
   headerTitle: { fontSize: 24, fontWeight: "800" },
+  headerActions: { flexDirection: "row", gap: Spacing.sm },
   iconBtn: { padding: Spacing.sm },
+  segmentRow: {
+    flexDirection: "row",
+    gap: Spacing.xs,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.xs,
+  },
+  segmentBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  segmentText: { fontSize: 14, fontWeight: "600" },
+  groupBack: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  groupBackText: { fontSize: 17, fontWeight: "700", flexShrink: 1 },
   genreScroll: { maxHeight: 44, marginBottom: Spacing.xs },
   genreContent: { paddingHorizontal: Spacing.lg, gap: Spacing.xs },
   genreChip: {
@@ -297,5 +532,23 @@ const styles = StyleSheet.create({
     padding: Spacing.xs,
   },
   sortLabel: { fontSize: 13, fontWeight: "600" },
+  groupRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: Spacing.md,
+  },
+  groupIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  groupInfo: { flex: 1 },
+  groupName: { fontSize: 15, fontWeight: "600" },
+  groupCount: { fontSize: 13, marginTop: 2 },
   listContent: { paddingBottom: 120 },
 });
