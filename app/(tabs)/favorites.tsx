@@ -3,7 +3,7 @@ import { Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -80,7 +80,10 @@ export default function FavoritesScreen() {
               onPress={() => playSong(item, favoriteSongs)}
             />
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: insets.bottom -45 },
+          ]}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -97,7 +100,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg,
+    paddingBottom: Spacing.md,
   },
   headerActions: {
     flexDirection: "row",

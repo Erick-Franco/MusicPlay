@@ -1,6 +1,7 @@
 import { PlayerControls } from "@/components/music/PlayerControls";
 import { ProgressBar } from "@/components/music/ProgressBar";
 import { SleepTimerModal } from "@/components/music/SleepTimerModal";
+import { SongArtwork } from "@/components/music/SongArtwork";
 import { SpeedControl } from "@/components/music/SpeedControl";
 import { VolumeControl } from "@/components/music/VolumeControl";
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
@@ -8,8 +9,8 @@ import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function NowPlayingScreen() {
@@ -78,16 +79,13 @@ export default function NowPlayingScreen() {
 
       {/* Artwork */}
       <View style={styles.artworkContainer}>
-        {currentSong.artwork ? (
-          <Image
-            source={{ uri: currentSong.artwork }}
-            style={[styles.artwork, { backgroundColor: colors.card }]}
-          />
-        ) : (
-          <View style={[styles.artwork, { backgroundColor: colors.card }]}>
-            <Ionicons name="musical-notes" size={80} color={colors.accent} />
-          </View>
-        )}
+        <SongArtwork
+          song={currentSong}
+          size={280}
+          borderRadius={BorderRadius.xl}
+          iconSize={80}
+          style={styles.artworkShadow}
+        />
       </View>
 
       {/* Song info */}
@@ -189,12 +187,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: Spacing.xxl,
   },
-  artwork: {
-    width: 280,
-    height: 280,
-    borderRadius: BorderRadius.xl,
-    alignItems: "center",
-    justifyContent: "center",
+  artworkShadow: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,

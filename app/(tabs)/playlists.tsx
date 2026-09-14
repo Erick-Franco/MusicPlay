@@ -6,7 +6,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Playlist } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -206,7 +206,7 @@ export default function PlaylistsScreen() {
                 onDelete={() => handleDeletePlaylist(playlist)}
               />
             ))}
-            <View style={{ height: 160 }} />
+            
           </>
         )}
         showsVerticalScrollIndicator={false}

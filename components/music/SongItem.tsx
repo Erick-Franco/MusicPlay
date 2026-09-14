@@ -1,11 +1,13 @@
-import { BorderRadius, Colors, Spacing } from "@/constants/theme";
+import { Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Song } from "@/types/types";
 import { formatDuration } from "@/utils/musicScanner";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+import { SongArtwork } from "./SongArtwork";
 
 interface SongItemProps {
   song: Song;
@@ -49,16 +51,7 @@ export function SongItem({
       activeOpacity={0.7}
     >
       {/* Artwork */}
-      {song.artwork ? (
-        <Image
-          source={{ uri: song.artwork }}
-          style={[styles.artwork, { backgroundColor: colors.card }]}
-        />
-      ) : (
-        <View style={[styles.artwork, { backgroundColor: colors.card }]}>
-          <Ionicons name="musical-note" size={20} color={colors.accent} />
-        </View>
-      )}
+      <SongArtwork song={song} size={48} />
 
       {/* Song info */}
       <View style={styles.info}>
@@ -103,17 +96,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: Spacing.md,
-  },
-  artwork: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.sm,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
   },
   info: { flex: 1, gap: 2 },
   title: { fontSize: 15, fontWeight: "600" },

@@ -6,10 +6,10 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import {
-    FlatList,
-    StyleSheet,
-    Text,
-    View
+  FlatList,
+  StyleSheet,
+  Text,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -72,7 +72,10 @@ export default function RecentsScreen() {
               onToggleFavorite={() => toggleFavorite(item.id)}
             />
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: insets.bottom - 45 },
+          ]}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -90,7 +93,7 @@ export default function RecentsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
+  header: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md},
   headerTitle: { fontSize: 28, fontWeight: "800" },
   headerCount: { fontSize: 13, marginTop: 2 },
   empty: {

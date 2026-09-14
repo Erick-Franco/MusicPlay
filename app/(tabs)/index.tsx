@@ -7,7 +7,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { SortBy, type Song } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -219,6 +219,7 @@ export default function LibraryScreen() {
     </TouchableOpacity>
   );
 
+  
   const header = (
     <View>
       {/* Header */}
@@ -412,17 +413,17 @@ export default function LibraryScreen() {
 
   const listContentStyle = [
     styles.listContent,
-    { paddingBottom: insets.bottom + 100 },
+    { paddingBottom: insets.bottom - 45 },
   ];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {header}
       {selectedGroup ? (
         <FlatList
           data={selectedGroupSongs}
           keyExtractor={(item) => item.id}
           renderItem={renderSongItem}
-          ListHeaderComponent={header}
           contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
         />
@@ -431,7 +432,6 @@ export default function LibraryScreen() {
           data={filteredSongs}
           keyExtractor={(item) => item.id}
           renderItem={renderSongItem}
-          ListHeaderComponent={header}
           contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
         />
@@ -440,7 +440,6 @@ export default function LibraryScreen() {
           data={filteredAlbums}
           keyExtractor={(item) => item.name}
           renderItem={renderGroupItem}
-          ListHeaderComponent={header}
           contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
         />
@@ -449,7 +448,6 @@ export default function LibraryScreen() {
           data={filteredArtists}
           keyExtractor={(item) => item.name}
           renderItem={renderGroupItem}
-          ListHeaderComponent={header}
           contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
         />

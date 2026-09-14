@@ -1,14 +1,27 @@
 import { Song } from "@/types/types";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import * as MediaLibrary from "expo-media-library";
+import * as MediaLibrary from "expo-media-library/legacy";
+
+/**
+ * Expo Go doesn't declare media-library permissions (READ_MEDIA_AUDIO) in its
+ * manifest, so requesting them always fails. Device scanning only works in a
+ * development build; the document picker is the fallback in Expo Go.
+ */
+export function isRunningInExpoGo(): boolean {
+  return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+}
 
 /**
  * Request permission to access the device's media library
  */
 export async function requestMusicPermission(): Promise<boolean> {
+  if (isRunningInExpoGo()) return false;
   try {
-    const { status } = await MediaLibrary.requestPermissionsAsync();
+    const { status } = await MediaLibrary.requestPermissionsAsync(false, [
+      "audio",
+    ]);
     return status === "granted";
   } catch (e) {
     console.warn("Permission request failed:", e);
@@ -19,13 +32,26 @@ export async function requestMusicPermission(): Promise<boolean> {
 /**
  * Scan the device for audio files and return them as Song objects.
  * Fetches in batches to handle large libraries.
+ *
+ * When `previousSongs` is provided (e.g. the cached library from a previous
+ * launch), songs that are still present on the device keep their embedded
+ * artwork and metadata without re-reading the file — only new or changed
+ * files pay the (expensive) artwork-extraction cost.
  */
-export async function scanDeviceMusic(): Promise<Song[]> {
+export async function scanDeviceMusic(
+  previousSongs?: Song[],
+): Promise<Song[]> {
   const hasPermission = await requestMusicPermission();
   if (!hasPermission) {
-    console.warn("Media library permission not granted");
+    if (!isRunningInExpoGo()) {
+      console.warn("Media library permission not granted");
+    }
     return [];
   }
+
+  const previousById = new Map(
+    (previousSongs ?? []).map((s) => [s.id, s]),
+  );
 
   const songs: Song[] = [];
   let hasNextPage = true;
@@ -41,6 +67,11 @@ export async function scanDeviceMusic(): Promise<Song[]> {
 
     const batchSongs = await Promise.all(
       media.assets.map(async (asset) => {
+        const cached = previousById.get(asset.id);
+        if (cached) {
+          // Reuse cached metadata and artwork, refresh cheap fields.
+          return { ...cached, duration: asset.duration, audioUri: asset.uri } as Song;
+        }
         const artwork = await extractArtwork(asset.uri);
         return {
           id: asset.id,
@@ -369,14 +400,115 @@ function parseMp4Picture(bytes: Uint8Array): Uint8Array | null {
   return bytes.subarray(imageStart, data.dataStart + data.size);
 }
 
-function toDataUri(imageBytes: Uint8Array): string {
-  const mime = detectMime(imageBytes);
-  return `data:${mime};base64,${bytesToBase64(imageBytes)}`;
+// ============================================================================
+// Artwork storage
+//
+// Artwork is written to real image files in the app's document directory and
+// `Song.artwork` stores the file URI. Embedded base64 data URIs (used by older
+// versions) make every list item carry megabytes across the JS bridge, which
+// makes any screen that renders song rows slow to open.
+// ============================================================================
+
+const ARTWORK_DIR = `${FileSystem.documentDirectory ?? ""}artwork/`;
+
+function hashString(input: string): string {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash << 5) - hash + input.charCodeAt(i);
+    hash |= 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function extForMime(mime: string): string {
+  switch (mime) {
+    case "image/png":
+      return "png";
+    case "image/gif":
+      return "gif";
+    case "image/webp":
+      return "webp";
+    case "image/bmp":
+      return "bmp";
+    default:
+      return "jpg";
+  }
+}
+
+async function ensureArtworkDir(): Promise<void> {
+  try {
+    await FileSystem.makeDirectoryAsync(ARTWORK_DIR, { intermediates: true });
+  } catch {
+    // Directory already exists.
+  }
+}
+
+function artworkFileFor(key: string, mime: string): string {
+  return `${ARTWORK_DIR}${hashString(key)}.${extForMime(mime)}`;
+}
+
+async function writeArtworkFile(
+  filePath: string,
+  base64: string,
+): Promise<void> {
+  const info = await FileSystem.getInfoAsync(filePath);
+  if ("exists" in info && info.exists) return;
+  await ensureArtworkDir();
+  await FileSystem.writeAsStringAsync(filePath, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+}
+
+async function storeArtworkFile(
+  audioUri: string,
+  imageBytes: Uint8Array,
+): Promise<string | null> {
+  try {
+    const mime = detectMime(imageBytes);
+    const filePath = artworkFileFor(audioUri, mime);
+    await writeArtworkFile(filePath, bytesToBase64(imageBytes));
+    return filePath;
+  } catch (e) {
+    console.warn("Failed to write artwork file:", e);
+    return null;
+  }
 }
 
 /**
- * Try to read the embedded cover art from an audio file and return it as a
- * `data:` URI. Returns null if the file has no readable artwork.
+ * Convert data-URI artwork (stored by older app versions) into real image
+ * files. Returns the same array reference when nothing needs migrating.
+ */
+export async function migrateArtworkToFiles(songs: Song[]): Promise<Song[]> {
+  let changed = false;
+  const migrated = await Promise.all(
+    songs.map(async (song): Promise<Song> => {
+      const dataUri = song.artwork;
+      if (!dataUri || !dataUri.startsWith("data:")) return song;
+      changed = true;
+      const comma = dataUri.indexOf(",");
+      if (comma < 1) return { ...song, artwork: null };
+      const mime =
+        dataUri.slice(5, comma).split(";")[0] || "image/jpeg";
+      const filePath = artworkFileFor(
+        `${song.id}:${song.audioUri ?? ""}`,
+        mime,
+      );
+      try {
+        await writeArtworkFile(filePath, dataUri.slice(comma + 1));
+        return { ...song, artwork: filePath };
+      } catch (e) {
+        console.warn("Failed to migrate artwork:", e);
+        return { ...song, artwork: null };
+      }
+    }),
+  );
+  return changed ? migrated : songs;
+}
+
+/**
+ * Try to read the embedded cover art from an audio file, write it to a real
+ * image file, and return its URI. Returns null if the file has no readable
+ * artwork or the file couldn't be written.
  */
 export async function extractArtwork(uri: string): Promise<string | null> {
   try {
@@ -392,7 +524,7 @@ export async function extractArtwork(uri: string): Promise<string | null> {
       const bytes = await readBytes(uri, 0, toRead);
       if (bytes) {
         const pic = parseId3Picture(bytes);
-        if (pic) return toDataUri(pic);
+        if (pic) return storeArtworkFile(uri, pic);
       }
     }
 
@@ -403,13 +535,13 @@ export async function extractArtwork(uri: string): Promise<string | null> {
         const bytes = await readBytes(uri, 0, Math.min(MAX_FLAC, size));
         if (bytes) {
           const pic = parseFlacPicture(bytes);
-          if (pic) return toDataUri(pic);
+          if (pic) return storeArtworkFile(uri, pic);
         }
       } else if (isAscii(probe, 4, "ftyp")) {
         const bytes = await readBytes(uri, 0, Math.min(MAX_MP4, size));
         if (bytes) {
           const pic = parseMp4Picture(bytes);
-          if (pic) return toDataUri(pic);
+          if (pic) return storeArtworkFile(uri, pic);
         }
       }
     }

@@ -1,6 +1,6 @@
 # MusicPlay
 
-Reproductor de música local para Android construido con **React Native + Expo (SDK 54)**, TypeScript y `expo-audio`.
+Reproductor de música local para Android construido con **React Native + Expo (SDK 57)**, TypeScript y `expo-audio`.
 
 ## Características
 
@@ -33,7 +33,8 @@ Desde la salida de `expo start` puedes abrir la app en un emulador Android o esc
 ```bash
 npx expo run:android          # development build
 npm run lint                  # eslint
-npx tsc --noEmit              # typecheck
+npm run typecheck             # typecheck
+npx expo-doctor               # valida la configuración del SDK
 ```
 
 ## Estructura

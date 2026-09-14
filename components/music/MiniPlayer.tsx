@@ -1,4 +1,4 @@
-import { BorderRadius, Colors, Spacing } from "@/constants/theme";
+import { Colors, Spacing } from "@/constants/theme";
 import {
   useMusicPlayer,
   usePlaybackStatus,
@@ -6,15 +6,10 @@ import {
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React from "react";
-import {
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { SongArtwork } from "./SongArtwork";
 
 export function MiniPlayer() {
   const colorScheme = useColorScheme() ?? "dark";
@@ -54,16 +49,7 @@ export function MiniPlayer() {
 
       <View style={styles.content}>
         {/* Artwork */}
-        {currentSong.artwork ? (
-          <Image
-            source={{ uri: currentSong.artwork }}
-            style={[styles.artwork, { backgroundColor: colors.card }]}
-          />
-        ) : (
-          <View style={[styles.artwork, { backgroundColor: colors.card }]}>
-            <Ionicons name="musical-note" size={18} color={colors.accent} />
-          </View>
-        )}
+        <SongArtwork song={currentSong} size={42} />
 
         {/* Song info */}
         <View style={styles.info}>
@@ -127,15 +113,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
     gap: Spacing.md,
-  },
-  artwork: {
-    width: 42,
-    height: 42,
-    borderRadius: BorderRadius.sm,
-    alignItems: "center",
-    justifyContent: "center",
   },
   info: {
     flex: 1,

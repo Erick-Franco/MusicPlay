@@ -1,10 +1,10 @@
+import { SongArtwork } from "@/components/music/SongArtwork";
 import { SongItem } from "@/components/music/SongItem";
 import { Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React from "react";
 import {
   Alert,
   ScrollView,
@@ -73,7 +73,7 @@ export default function QueueScreen() {
             </Text>
           </TouchableOpacity>
         ) : (
-          <View style={{ width: 36 }} />
+          <View style={{ width: 360 }} />
         )}
       </View>
 
@@ -144,18 +144,21 @@ export default function QueueScreen() {
                     onPress={() => playSong(song, queue)}
                     activeOpacity={0.7}
                   >
-                    <Text
-                      style={[styles.rowTitle, { color: colors.text }]}
-                      numberOfLines={1}
-                    >
-                      {song.title}
-                    </Text>
-                    <Text
-                      style={[styles.rowSub, { color: colors.textSecondary }]}
-                      numberOfLines={1}
-                    >
-                      {song.artist}
-                    </Text>
+                    <SongArtwork song={song} size={40} />
+                    <View style={styles.rowInfo}>
+                      <Text
+                        style={[styles.rowTitle, { color: colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {song.title}
+                      </Text>
+                      <Text
+                        style={[styles.rowSub, { color: colors.textSecondary }]}
+                        numberOfLines={1}
+                      >
+                        {song.artist}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => removeFromQueue(index)}
@@ -227,10 +230,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingLeft: Spacing.lg,
     paddingRight: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  rowMain: { flex: 1, paddingRight: Spacing.md },
+  rowMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: Spacing.md, paddingRight: Spacing.md },
+  rowInfo: { flex: 1 },
   rowTitle: { fontSize: 15, fontWeight: "600" },
   rowSub: { fontSize: 13, marginTop: 2 },
   removeBtn: { padding: Spacing.xs },

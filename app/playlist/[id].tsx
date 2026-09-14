@@ -1,5 +1,6 @@
 import { AddSongsToPlaylistModal } from "@/components/music/AddSongsToPlaylistModal";
 import { MiniPlayer } from "@/components/music/MiniPlayer";
+import { SongArtwork } from "@/components/music/SongArtwork";
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -7,14 +8,133 @@ import { Song } from "@/types/types";
 import { formatDuration } from "@/utils/musicScanner";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import DraggableFlatList, {
-    RenderItemParams,
-    ScaleDecorator,
-} from "react-native-draggable-flatlist";
+import { memo, useCallback, useMemo, useState } from "react";
+import {
+  Alert,
+  ListRenderItemInfo,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import ReorderableList, {
+  ReorderableListReorderEvent,
+  useIsActive,
+  useReorderableDrag,
+} from "react-native-reorderable-list";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+interface PlaylistSongRowProps {
+  item: Song;
+  index: number;
+  isCurrentPlaying: boolean;
+  isFavoriteSong: boolean;
+  onPress: (song: Song) => void;
+  onLongPress: (songId: string, songTitle: string) => void;
+  onToggleFavorite: (songId: string) => void;
+}
+
+const PlaylistSongRow = memo(function PlaylistSongRow({
+  item,
+  index,
+  isCurrentPlaying,
+  isFavoriteSong,
+  onPress,
+  onLongPress,
+  onToggleFavorite,
+}: PlaylistSongRowProps) {
+  const colorScheme = useColorScheme() ?? "dark";
+  const colors = Colors[colorScheme];
+  const drag = useReorderableDrag();
+  const isActive = useIsActive();
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.songRow,
+        {
+          borderBottomColor: colors.border,
+          backgroundColor: isActive
+            ? colors.accent + "25"
+            : isCurrentPlaying
+              ? colors.accent + "10"
+              : "transparent",
+        },
+      ]}
+      onPress={() => onPress(item)}
+      onLongPress={() => onLongPress(item.id, item.title)}
+      delayLongPress={250}
+      activeOpacity={0.7}
+    >
+      {/* Artwork */}
+      <SongArtwork song={item} size={44} />
+      {/* Info */}
+      <View style={styles.songInfo}>
+        <Text
+          style={[
+            styles.songTitle,
+            { color: isCurrentPlaying ? colors.accent : colors.text },
+          ]}
+          numberOfLines={1}
+        >
+          {item.title}
+        </Text>
+        <Text
+          style={[styles.songArtist, { color: colors.textSecondary }]}
+          numberOfLines={1}
+        >
+          {item.artist}
+        </Text>
+      </View>
+      {/* Duration */}
+      <Text style={[styles.songDuration, { color: colors.textSecondary }]}>
+        {formatDuration(item.duration)}
+      </Text>
+      {/* Index */}
+      <Text
+        style={[
+          styles.indexLabel,
+          {
+            color: isCurrentPlaying ? colors.accent : colors.textSecondary,
+          },
+        ]}
+      >
+        {index + 1}
+      </Text>
+      {/* Favorite */}
+      <TouchableOpacity
+        onPress={() => onToggleFavorite(item.id)}
+        style={styles.actionBtn}
+      >
+        <Ionicons
+          name={isFavoriteSong ? "heart" : "heart-outline"}
+          size={20}
+          color={isFavoriteSong ? colors.favorite : colors.textSecondary}
+        />
+      </TouchableOpacity>
+      {/* Menu */}
+      <TouchableOpacity
+        onPress={() => onLongPress(item.id, item.title)}
+        style={styles.actionBtn}
+      >
+        <Ionicons
+          name="ellipsis-vertical"
+          size={18}
+          color={colors.textSecondary}
+        />
+      </TouchableOpacity>
+      {/* Drag handle */}
+      <TouchableOpacity
+        onPressIn={drag}
+        style={styles.dragHandle}
+        accessibilityLabel="Reordenar"
+      >
+        <Ionicons name="reorder-three" size={24} color={colors.textSecondary} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+});
 
 export default function PlaylistDetailScreen() {
   const colorScheme = useColorScheme() ?? "dark";
@@ -46,6 +166,8 @@ export default function PlaylistDetailScreen() {
       .map((songId) => songs.find((s) => s.id === songId))
       .filter((s): s is Song => s !== undefined);
   }, [playlist, songs]);
+
+  const keyExtractor = useCallback((item: Song) => item.id, []);
 
   const handleShufflePlay = () => {
     if (playlistSongs.length === 0) return;
@@ -85,8 +207,8 @@ export default function PlaylistDetailScreen() {
     [playlist, removeSongFromPlaylist, deleteSongFromDevice],
   );
 
-  const handleDragEnd = useCallback(
-    ({ data, from, to }: { data: Song[]; from: number; to: number }) => {
+  const handleReorder = useCallback(
+    ({ from, to }: ReorderableListReorderEvent) => {
       if (from !== to && playlist) {
         reorderPlaylistSong(playlist.id, from, to);
       }
@@ -94,106 +216,35 @@ export default function PlaylistDetailScreen() {
     [playlist, reorderPlaylistSong],
   );
 
+  const handlePlay = useCallback(
+    (song: Song) => playSong(song, playlistSongs),
+    [playSong, playlistSongs],
+  );
+
+  const handleToggleFavorite = useCallback(
+    (songId: string) => toggleFavorite(songId),
+    [toggleFavorite],
+  );
+
   const renderSongItem = useCallback(
-    ({ item, drag, isActive, getIndex }: RenderItemParams<Song>) => {
-      const index = getIndex() ?? 0;
-      const isCurrentPlaying = currentSong?.id === item.id;
-      return (
-        <ScaleDecorator>
-          <TouchableOpacity
-            style={[
-              styles.songRow,
-              {
-                borderBottomColor: colors.border,
-                backgroundColor: isActive
-                  ? colors.accent + "25"
-                  : isCurrentPlaying
-                    ? colors.accent + "10"
-                    : "transparent",
-              },
-            ]}
-            onPress={() => playSong(item, playlistSongs)}
-            onLongPress={() => handleSongMenu(item.id, item.title)}
-            activeOpacity={0.7}
-          >
-            {/* Drag handle */}
-            <TouchableOpacity
-              onPressIn={drag}
-              style={styles.dragHandle}
-              delayLongPress={0}
-            >
-              <Ionicons
-                name="reorder-three"
-                size={22}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-            {/* Index */}
-            <Text
-              style={[
-                styles.indexLabel,
-                {
-                  color: isCurrentPlaying
-                    ? colors.accent
-                    : colors.textSecondary,
-                },
-              ]}
-            >
-              {index + 1}
-            </Text>
-            {/* Info */}
-            <View style={styles.songInfo}>
-              <Text
-                style={[
-                  styles.songTitle,
-                  { color: isCurrentPlaying ? colors.accent : colors.text },
-                ]}
-                numberOfLines={1}
-              >
-                {item.title}
-              </Text>
-              <Text
-                style={[styles.songArtist, { color: colors.textSecondary }]}
-                numberOfLines={1}
-              >
-                {item.artist}
-              </Text>
-            </View>
-            {/* Duration */}
-            <Text
-              style={[styles.songDuration, { color: colors.textSecondary }]}
-            >
-              {formatDuration(item.duration)}
-            </Text>
-            {/* Favorite */}
-            <TouchableOpacity
-              onPress={() => toggleFavorite(item.id)}
-              style={styles.actionBtn}
-            >
-              <Ionicons
-                name={isFavorite(item.id) ? "heart" : "heart-outline"}
-                size={20}
-                color={
-                  isFavorite(item.id) ? colors.favorite : colors.textSecondary
-                }
-              />
-            </TouchableOpacity>
-            {/* Menu */}
-            <TouchableOpacity
-              onPress={() => handleSongMenu(item.id, item.title)}
-              style={styles.actionBtn}
-            >
-              <Ionicons
-                name="ellipsis-vertical"
-                size={18}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </ScaleDecorator>
-      );
-    },
-    [currentSong, colors, playlistSongs, isFavorite, toggleFavorite, playSong, handleSongMenu],
+    ({ item, index }: ListRenderItemInfo<Song>) => (
+      <PlaylistSongRow
+        item={item}
+        index={index}
+        isCurrentPlaying={currentSong?.id === item.id}
+        isFavoriteSong={isFavorite(item.id)}
+        onPress={handlePlay}
+        onLongPress={handleSongMenu}
+        onToggleFavorite={handleToggleFavorite}
+      />
+    ),
+    [
+      currentSong,
+      isFavorite,
+      handlePlay,
+      handleSongMenu,
+      handleToggleFavorite,
+    ],
   );
 
   if (!playlist) {
@@ -288,17 +339,17 @@ export default function PlaylistDetailScreen() {
           </View>
         ) : (
           <View style={{ flex: 1 }}>
-            <DraggableFlatList
+            <ReorderableList
               data={playlistSongs}
-              keyExtractor={(item) => item.id}
+              keyExtractor={keyExtractor}
               renderItem={renderSongItem}
-              onDragEnd={handleDragEnd}
+              onReorder={handleReorder}
               contentContainerStyle={[
                 styles.listContent,
-                { paddingBottom: insets.bottom + 100 }
+                { paddingBottom: insets.bottom - 45 },
               ]}
               showsVerticalScrollIndicator={false}
-              activationDistance={10}
+              shouldUpdateActiveItem
             />
           </View>
         )}
@@ -392,13 +443,14 @@ const styles = StyleSheet.create({
   songRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingRight: Spacing.lg,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: Spacing.sm,
   },
   dragHandle: {
-    paddingHorizontal: Spacing.md,
+    paddingLeft: Spacing.sm,
+    paddingRight: Spacing.xs,
     paddingVertical: Spacing.sm,
   },
   indexLabel: {

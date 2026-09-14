@@ -1,0 +1,183 @@
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
+index 196a5d5..ee58cb7 100644
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
+@@ -90,6 +90,8 @@ class AudioControlsService : MediaSessionService() {
+ 
+         ACTION_SEEK_FORWARD -> currentPlayerRef.seekTo(currentPlayerRef.currentPosition + SEEK_INTERVAL_MS)
+         ACTION_SEEK_BACKWARD -> currentPlayerRef.seekTo(currentPlayerRef.currentPosition - SEEK_INTERVAL_MS)
++        ACTION_PREVIOUS -> dispatchTrackCommand("previous")
++        ACTION_NEXT -> dispatchTrackCommand("next")
+       }
+     }
+ 
+@@ -97,6 +99,12 @@ class AudioControlsService : MediaSessionService() {
+     return super.onStartCommand(intent, flags, startId)
+   }
+ 
++  internal fun dispatchTrackCommand(command: String) {
++    appContext?.mainQueue?.launch {
++      currentPlayer?.emit("lockScreenCommand", command)
++    }
++  }
++
+   private fun ensureForegroundNotification() {
+     val notification = buildNotification() ?: buildPlaceholderNotification()
+     try {
+@@ -192,6 +200,17 @@ class AudioControlsService : MediaSessionService() {
+       val compactViewIndices = mutableListOf<Int>()
+       var currentIndex = 0
+ 
++      // Previous track (always present)
++      builder.addAction(
++        NotificationCompat.Action(
++          androidx.media3.session.R.drawable.media3_icon_previous,
++          "Previous",
++          buildActionPendingIntent(ACTION_PREVIOUS)
++        )
++      )
++      compactViewIndices.add(currentIndex)
++      currentIndex++
++
+       if (currentOptions?.showSeekBackward == true) {
+         builder.addAction(
+           NotificationCompat.Action(
+@@ -200,7 +219,6 @@ class AudioControlsService : MediaSessionService() {
+             buildActionPendingIntent(ACTION_SEEK_BACKWARD)
+           )
+         )
+-        compactViewIndices.add(currentIndex)
+         currentIndex++
+       }
+ 
+@@ -226,9 +244,19 @@ class AudioControlsService : MediaSessionService() {
+             buildActionPendingIntent(ACTION_SEEK_FORWARD)
+           )
+         )
+-        compactViewIndices.add(currentIndex)
++        currentIndex++
+       }
+ 
++      // Next track (always present)
++      builder.addAction(
++        NotificationCompat.Action(
++          androidx.media3.session.R.drawable.media3_icon_next,
++          "Next",
++          buildActionPendingIntent(ACTION_NEXT)
++        )
++      )
++      compactViewIndices.add(currentIndex)
++
+       style.setShowActionsInCompactView(*compactViewIndices.toIntArray())
+     }
+ 
+@@ -240,6 +268,17 @@ class AudioControlsService : MediaSessionService() {
+     val session = mediaSession ?: return
+     val mediaButtons = mutableListOf<CommandButton>()
+ 
++    // Add previous track button (always present)
++    mediaButtons.add(
++      CommandButton.Builder(CommandButton.ICON_PREVIOUS)
++        .setDisplayName("Previous")
++        .setEnabled(true)
++        .setSessionCommand(SessionCommand(ACTION_PREVIOUS, Bundle.EMPTY))
++        .setSlots(CommandButton.SLOT_BACK)
++
++        .build()
++    )
++
+     // Add seek backward button if enabled
+     if (currentOptions?.showSeekBackward == true) {
+       mediaButtons.add(
+@@ -274,6 +313,16 @@ class AudioControlsService : MediaSessionService() {
+       )
+     }
+ 
++    // Add next track button (always present)
++    mediaButtons.add(
++      CommandButton.Builder(CommandButton.ICON_NEXT)
++        .setDisplayName("Next")
++        .setEnabled(true)
++        .setSessionCommand(SessionCommand(ACTION_NEXT, Bundle.EMPTY))
++        .setSlots(CommandButton.SLOT_FORWARD)
++        .build()
++    )
++
+     session.setCustomLayout(mediaButtons)
+     session.setMediaButtonPreferences(mediaButtons)
+   }
+@@ -371,7 +420,7 @@ class AudioControlsService : MediaSessionService() {
+           updateMetadata(metadata)
+         }
+         val session = MediaSession.Builder(context, sessionPlayer)
+-          .setCallback(AudioMediaSessionCallback())
++          .setCallback(AudioMediaSessionCallback(this@AudioControlsService))
+           .build()
+ 
+         // Replace the basic media session with a session connected to our playback service.
+@@ -452,7 +501,7 @@ class AudioControlsService : MediaSessionService() {
+           updateMetadata(metadata)
+         }
+         val session = MediaSession.Builder(context, sessionPlayer)
+-          .setCallback(AudioMediaSessionCallback())
++          .setCallback(AudioMediaSessionCallback(this@AudioControlsService))
+           .build()
+ 
+         player.mediaSession.release()
+@@ -535,6 +584,10 @@ class AudioControlsService : MediaSessionService() {
+       }
+ 
+       override fun onPlaybackStateChanged(playbackState: Int) {
++        // Re-apply the custom button layout whenever the player state changes
++        // (e.g. during track replacement), otherwise the system media widget
++        // can drop the previous/next buttons until the session is refreshed.
++        updateSessionCustomLayout(player.ref.isPlaying)
+         postOrStartForegroundNotification(startInForeground = false)
+       }
+     }
+@@ -558,6 +611,8 @@ class AudioControlsService : MediaSessionService() {
+ 
+     const val ACTION_SEEK_FORWARD = "expo.modules.audio.action.SEEK_FORWARD"
+     const val ACTION_SEEK_BACKWARD = "expo.modules.audio.action.SEEK_BACKWARD"
++    const val ACTION_PREVIOUS = "expo.modules.audio.action.PREVIOUS"
++    const val ACTION_NEXT = "expo.modules.audio.action.NEXT"
+ 
+     const val SEEK_INTERVAL_MS = 10000L
+   }
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
+index 839aaef..5425d90 100644
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
+@@ -10,7 +10,9 @@ import androidx.media3.common.util.UnstableApi
+ import com.google.common.util.concurrent.ListenableFuture
+ 
+ @OptIn(UnstableApi::class)
+-class AudioMediaSessionCallback : MediaSession.Callback {
++class AudioMediaSessionCallback(
++  private val service: AudioControlsService
++) : MediaSession.Callback {
+   override fun onConnect(
+     session: MediaSession,
+     controller: MediaSession.ControllerInfo
+@@ -35,6 +37,8 @@ class AudioMediaSessionCallback : MediaSession.Callback {
+           MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+             .add(SessionCommand(AudioControlsService.ACTION_SEEK_BACKWARD, Bundle.EMPTY))
+             .add(SessionCommand(AudioControlsService.ACTION_SEEK_FORWARD, Bundle.EMPTY))
++            .add(SessionCommand(AudioControlsService.ACTION_PREVIOUS, Bundle.EMPTY))
++            .add(SessionCommand(AudioControlsService.ACTION_NEXT, Bundle.EMPTY))
+             .build()
+         )
+         .build()
+@@ -56,6 +60,12 @@ class AudioMediaSessionCallback : MediaSession.Callback {
+       AudioControlsService.ACTION_SEEK_BACKWARD -> {
+         session.player.seekTo(session.player.currentPosition - AudioControlsService.SEEK_INTERVAL_MS)
+       }
++      AudioControlsService.ACTION_PREVIOUS -> {
++        service.dispatchTrackCommand("previous")
++      }
++      AudioControlsService.ACTION_NEXT -> {
++        service.dispatchTrackCommand("next")
++      }
+     }
+     return super.onCustomCommand(session, controller, command, args)
+   }

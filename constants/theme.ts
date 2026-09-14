@@ -1,7 +1,3 @@
-/**
- * MusicPlay Theme - Premium dark music player aesthetic
- */
-
 import { Platform } from "react-native";
 
 export const Colors = {

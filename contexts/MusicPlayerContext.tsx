@@ -1,13 +1,19 @@
 import { sampleSongs } from "@/data/songs";
 import { Playlist, RepeatMode, Song } from "@/types/types";
-import { pickAudioFiles, scanDeviceMusic } from "@/utils/musicScanner";
+import {
+  migrateArtworkToFiles,
+  pickAudioFiles,
+  scanDeviceMusic,
+} from "@/utils/musicScanner";
 import {
   loadFavorites,
+  loadLibraryCache,
   loadPlayCounts,
   loadPlaylists,
   loadRecents,
   loadSettings,
   saveFavorites,
+  saveLibraryCache,
   savePlayCounts,
   savePlaylists,
   saveRecents,
@@ -19,7 +25,8 @@ import {
   useAudioPlayerStatus,
 } from "expo-audio";
 import type { AudioStatus } from "expo-audio";
-import * as MediaLibrary from "expo-media-library";
+import * as MediaLibrary from "expo-media-library/legacy";
+import * as FileSystem from "expo-file-system/legacy";
 import React, {
   createContext,
   useCallback,
@@ -192,6 +199,9 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
   // Refs
   const queueRef = useRef(queue);
   const queueIndexRef = useRef(queueIndex);
+  // Original (non-shuffled) order of the current playback context. Used to
+  // restore a deterministic order when shuffle is toggled off.
+  const baseQueueRef = useRef<Song[]>([]);
   const repeatModeRef = useRef(repeatMode);
   const isShuffleOnRef = useRef(isShuffleOn);
   const sleepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -204,6 +214,7 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
   const lastSavedPositionRef = useRef(0);
   const undoHandlerRef = useRef<(() => void) | null>(null);
   const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lockScreenActiveRef = useRef(false);
   queueRef.current = queue;
   queueIndexRef.current = queueIndex;
   repeatModeRef.current = repeatMode;
@@ -300,12 +311,35 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
           rateRef.current = savedSettings.playbackRate;
         }
 
-        // Auto-scan device music
+        // Show the cached library immediately so the app is usable right away.
+        const cachedLibrary = await loadLibraryCache();
+        let initialLibrary =
+          cachedLibrary && cachedLibrary.length > 0 ? cachedLibrary : null;
+        if (initialLibrary) setSongs(initialLibrary);
+
+        // One-time migration: older versions stored artwork as embedded base64
+        // data URIs in the cache, which makes every list decode megabytes of
+        // images on mount. Convert them to real image files on the first
+        // launch of this version, then persist the tiny file references.
+        if (initialLibrary) {
+          const migrated = await migrateArtworkToFiles(initialLibrary);
+          if (migrated !== initialLibrary) {
+            initialLibrary = migrated;
+            setSongs(migrated);
+            await saveLibraryCache(migrated);
+          }
+        }
+
+        // Background refresh: re-scan the device reusing cached artwork, so
+        // unchanged songs don't pay the expensive art-extraction cost.
         setIsLoadingLibrary(true);
         let deviceSongs: Song[] = [];
         try {
-          deviceSongs = await scanDeviceMusic();
-          if (deviceSongs.length > 0) setSongs(deviceSongs);
+          deviceSongs = await scanDeviceMusic(initialLibrary ?? undefined);
+          if (deviceSongs.length > 0) {
+            setSongs(deviceSongs);
+            await saveLibraryCache(deviceSongs);
+          }
         } catch (scanErr) {
           console.warn("Failed to auto-scan device music:", scanErr);
         } finally {
@@ -315,7 +349,8 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
         // Restore last played song (paused, at its saved position)
         const lastId = savedSettings.lastSongId;
         if (lastId) {
-          const library = deviceSongs.length > 0 ? deviceSongs : sampleSongs;
+          const library =
+            deviceSongs.length > 0 ? deviceSongs : initialLibrary ?? sampleSongs;
           const restored =
             library.find((s) => s.id === lastId) ??
             songs.find((s) => s.id === lastId);
@@ -366,14 +401,17 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
   const loadDeviceMusic = useCallback(async () => {
     setIsLoadingLibrary(true);
     try {
-      const deviceSongs = await scanDeviceMusic();
-      if (deviceSongs.length > 0) setSongs(deviceSongs);
+      const deviceSongs = await scanDeviceMusic(songs);
+      if (deviceSongs.length > 0) {
+        setSongs(deviceSongs);
+        await saveLibraryCache(deviceSongs);
+      }
     } catch (e) {
       console.warn("Failed to scan device music:", e);
     } finally {
       setIsLoadingLibrary(false);
     }
-  }, []);
+  }, [songs]);
 
   const pickMusicFiles = useCallback(async () => {
     try {
@@ -421,12 +459,24 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
 
         player.replace({ uri: song.audioUri });
 
-        // Setup lockscreen/notification controls
-        player.setActiveForLockScreen(true, {
-          title: song.title,
-          artist: song.artist,
-          albumTitle: song.album || "MusicPlay",
-        });
+        // Setup lockscreen/notification controls. Rebuilding the media
+        // session on every track change (via setActiveForLockScreen) makes
+        // the notification lose its buttons, so activate once and then only
+        // update the metadata for subsequent tracks.
+        if (!lockScreenActiveRef.current) {
+          player.setActiveForLockScreen(true, {
+            title: song.title,
+            artist: song.artist,
+            albumTitle: song.album || "MusicPlay",
+          });
+          lockScreenActiveRef.current = true;
+        } else {
+          player.updateLockScreenMetadata({
+            title: song.title,
+            artist: song.artist,
+            albumTitle: song.album || "MusicPlay",
+          });
+        }
         player.volume = isMutedRef.current ? 0 : volumeRef.current;
         player.setPlaybackRate(rateRef.current);
         player.play();
@@ -465,6 +515,8 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
     if (currentIndex >= q.length - 1) {
       if (repeat === RepeatMode.ALL) {
         const nextOrder = shuffleOn ? shuffleArray(q) : q;
+        queueRef.current = nextOrder;
+        queueIndexRef.current = 0;
         setQueue(nextOrder);
         setQueueIndex(0);
         await loadAndPlay(nextOrder[0]);
@@ -473,6 +525,7 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
         saveCurrentState();
       }
     } else {
+      queueIndexRef.current = currentIndex + 1;
       setQueueIndex(currentIndex + 1);
       await loadAndPlay(q[currentIndex + 1]);
     }
@@ -492,15 +545,20 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
   const playSong = useCallback(
     async (song: Song, newQueue?: Song[]) => {
       const songQueue = newQueue || songs;
+      baseQueueRef.current = songQueue;
       const index = songQueue.findIndex((s) => s.id === song.id);
       if (isShuffleOnRef.current && songQueue.length > 1) {
         // Shuffle: the tapped song plays first, the rest in a shuffled
         // order where every song plays exactly once.
         const remaining = songQueue.filter((_, i) => i !== index);
         const order = [song, ...shuffleArray(remaining)];
+        queueRef.current = order;
+        queueIndexRef.current = 0;
         setQueue(order);
         setQueueIndex(0);
       } else {
+        queueRef.current = songQueue;
+        queueIndexRef.current = index >= 0 ? index : 0;
         setQueue(songQueue);
         setQueueIndex(index >= 0 ? index : 0);
       }
@@ -512,13 +570,17 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
   const shufflePlay = useCallback(
     async (list: Song[]) => {
       if (list.length === 0) return;
+      baseQueueRef.current = list;
       if (!isShuffleOnRef.current) {
         isShuffleOnRef.current = true;
         setIsShuffleOn(true);
       }
       const first = list[Math.floor(Math.random() * list.length)];
       const remaining = list.filter((s) => s.id !== first.id);
-      setQueue([first, ...shuffleArray(remaining)]);
+      const order = [first, ...shuffleArray(remaining)];
+      queueRef.current = order;
+      queueIndexRef.current = 0;
+      setQueue(order);
       setQueueIndex(0);
       await loadAndPlay(first);
     },
@@ -582,9 +644,37 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
     }
     const currentIdx = queueIndexRef.current;
     const prevIdx = currentIdx === 0 ? currentQueue.length - 1 : currentIdx - 1;
+    queueIndexRef.current = prevIdx;
     setQueueIndex(prevIdx);
     await loadAndPlay(currentQueue[prevIdx]);
   }, [loadAndPlay, seekTo]);
+
+  // Forward Android lock-screen / notification track commands to the app.
+  // Emitted natively by expo-audio's playback service via "lockScreenCommand".
+  const nextRef = useRef(next);
+  const previousRef = useRef(previous);
+  nextRef.current = next;
+  previousRef.current = previous;
+
+  useEffect(() => {
+    const playerWithLockScreenEvents = player as unknown as {
+      addListener: (
+        eventName: string,
+        listener: (command: string) => void,
+      ) => { remove: () => void };
+    };
+    const subscription = playerWithLockScreenEvents.addListener(
+      "lockScreenCommand",
+      (command) => {
+        if (command === "next") {
+          nextRef.current();
+        } else if (command === "previous") {
+          previousRef.current();
+        }
+      },
+    );
+    return () => subscription.remove();
+  }, [player]);
 
   const removeFromQueue = useCallback(
     (index: number) => {
@@ -653,15 +743,27 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
     const nextValue = !isShuffleOnRef.current;
     isShuffleOnRef.current = nextValue;
     setIsShuffleOn(nextValue);
+
+    const current = currentSongRef.current;
+    if (!current || queueRef.current.length === 0) return;
+
     if (nextValue) {
-      // Rebuild the queue so the current song stays first and the rest
-      // plays in a shuffled order (each song exactly once).
-      const current = currentSongRef.current;
-      if (current && queueRef.current.length > 1) {
-        const remaining = queueRef.current.filter((s) => s.id !== current.id);
-        setQueue([current, ...shuffleArray(remaining)]);
-        setQueueIndex(0);
-      }
+      // ON: keep the current song first and shuffle only what hasn't played
+      // yet, so every song still plays exactly once.
+      const upcoming = queueRef.current.slice(queueIndexRef.current + 1);
+      setQueue([current, ...shuffleArray(upcoming)]);
+      setQueueIndex(0);
+    } else {
+      // OFF: restore the deterministic (original) order for the songs that
+      // remain, keeping what already played in place and matching the current.
+      const played = queueRef.current.slice(0, queueIndexRef.current);
+      const upcoming = queueRef.current.slice(queueIndexRef.current + 1);
+      const upcomingIds = new Set(upcoming.map((s) => s.id));
+      const orderedUpcoming = baseQueueRef.current.filter((s) =>
+        upcomingIds.has(s.id),
+      );
+      setQueue([...played, current, ...orderedUpcoming]);
+      setQueueIndex(played.length);
     }
   }, []);
 
@@ -836,7 +938,19 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
           }
         }
         // Remove from songs list
-        setSongs((prev) => prev.filter((s) => s.id !== songId));
+        setSongs((prev) => {
+          const remaining = prev.filter((s) => s.id !== songId);
+          saveLibraryCache(remaining);
+          return remaining;
+        });
+        // Remove the song's artwork file (if it was persisted to disk)
+        if (song.artwork && song.artwork.startsWith(FileSystem.documentDirectory ?? "")) {
+          try {
+            await FileSystem.deleteAsync(song.artwork, { idempotent: true });
+          } catch (deleteArtErr) {
+            console.warn("Failed to delete artwork file:", deleteArtErr);
+          }
+        }
         // Remove from all playlists
         setPlaylists((prev) => {
           const updated = prev.map((p) => ({

@@ -14,6 +14,8 @@ import {
     View,
 } from "react-native";
 
+import { SongArtwork } from "./SongArtwork";
+
 interface AddSongsToPlaylistModalProps {
   visible: boolean;
   onClose: () => void;
@@ -149,16 +151,8 @@ export function AddSongsToPlaylistModal({
                   )}
                 </View>
 
-                {/* Artwork placeholder */}
-                <View
-                  style={[styles.artwork, { backgroundColor: colors.card }]}
-                >
-                  <Ionicons
-                    name="musical-note"
-                    size={16}
-                    color={colors.accent}
-                  />
-                </View>
+                {/* Artwork */}
+                <SongArtwork song={item} size={40} />
 
                 {/* Info */}
                 <View style={styles.info}>
@@ -233,7 +227,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: Spacing.md,
   },
@@ -242,13 +236,6 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  artwork: {
-    width: 40,
-    height: 40,
-    borderRadius: BorderRadius.sm,
     alignItems: "center",
     justifyContent: "center",
   },

@@ -7,7 +7,6 @@
     "icon": "./assets/images/logomusic.png",
     "scheme": "musicplay",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
@@ -16,7 +15,6 @@
         "backgroundColor": "#1A1A2E",
         "foregroundImage": "./assets/images/logomusic.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.READ_MEDIA_AUDIO",
@@ -55,7 +53,8 @@
         "expo-media-library",
         {
           "photosPermission": false,
-          "savePhotosPermission": false
+          "savePhotosPermission": false,
+          "granularPermissions": ["audio"]
         }
       ],
       [
@@ -64,7 +63,11 @@
           "microphonePermission": false,
           "enableBackgroundPlayback": true
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-status-bar",
+      "expo-system-ui"
     ],
     "experiments": {
       "typedRoutes": true,
