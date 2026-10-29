@@ -8,7 +8,7 @@ Reproductor de música local para Android construido con **React Native + Expo (
 - **Reproducción**: play/pause, anterior/siguiente, búsqueda dentro de la canción (seek), volumen y silencio.
 - **Modos**: aleatorio (shuffle) y repetición (una / todas).
 - **Favoritos**: marca canciones con corazón, persistidas localmente.
-- **Playlists**: crear, eliminar, agregar/quitar canciones y reordenar con arrastre (`react-native-draggable-flatlist`).
+- **Playlists**: crear, eliminar, agregar/quitar canciones y reordenar con arrastre (`react-native-reorderable-list`).
 - **Playlists inteligentes**: reproducidas recientemente, más escuchadas (contador persistente de reproducciones) y agregadas recientemente.
 - **Temporizador de sueño**: detiene la reproducción al cumplirse el tiempo.
 - **Mini player y Now Playing**: controles rápidos y pantalla de reproducción con carátula y progreso.
