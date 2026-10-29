@@ -1,45 +1,62 @@
 import { Platform } from "react-native";
 
+// "Glass oscuro con neón": deep backgrounds, translucent glass surfaces and
+// violet→pink neon accents. `card` is translucent so every chip, search bar
+// and placeholder picks up the glass look over the glow background.
 export const Colors = {
   light: {
-    text: "#11181C",
-    textSecondary: "#687076",
-    background: "#F8F9FA",
+    text: "#14111F",
+    textSecondary: "#6B6880",
+    background: "#F4F2FA",
     surface: "#FFFFFF",
-    card: "#F0F2F5",
+    card: "rgba(20, 10, 60, 0.05)",
     tint: "#8B5CF6",
-    accent: "#A855F7",
+    accent: "#8B5CF6",
     accentGradientStart: "#8B5CF6",
     accentGradientEnd: "#EC4899",
-    icon: "#687076",
-    tabIconDefault: "#687076",
+    icon: "#6B6880",
+    tabIconDefault: "#8A879C",
     tabIconSelected: "#8B5CF6",
-    border: "#E5E7EB",
+    border: "rgba(20, 10, 60, 0.08)",
     playerBackground: "#FFFFFF",
-    miniPlayerBackground: "#F8F9FA",
+    miniPlayerBackground: "rgba(255, 255, 255, 0.85)",
     danger: "#EF4444",
-    favorite: "#EF4444",
+    favorite: "#EC4899",
+    glass: "rgba(255, 255, 255, 0.65)",
+    glassStrong: "rgba(255, 255, 255, 0.9)",
+    glassBorder: "rgba(20, 10, 60, 0.08)",
+    glowPrimary: "rgba(139, 92, 246, 0.22)",
+    glowSecondary: "rgba(236, 72, 153, 0.16)",
   },
   dark: {
-    text: "#F1F5F9",
-    textSecondary: "#94A3B8",
-    background: "#0F0F1A",
-    surface: "#1A1A2E",
-    card: "#16213E",
+    text: "#F5F3FF",
+    textSecondary: "#9A97B0",
+    background: "#07070D",
+    surface: "#13121F",
+    card: "rgba(255, 255, 255, 0.06)",
     tint: "#A855F7",
     accent: "#A855F7",
     accentGradientStart: "#8B5CF6",
     accentGradientEnd: "#EC4899",
-    icon: "#94A3B8",
-    tabIconDefault: "#94A3B8",
-    tabIconSelected: "#A855F7",
-    border: "#2D2D44",
-    playerBackground: "#1A1A2E",
-    miniPlayerBackground: "#16213E",
-    danger: "#EF4444",
-    favorite: "#EF4444",
+    icon: "#9A97B0",
+    tabIconDefault: "#6E6B85",
+    tabIconSelected: "#C084FC",
+    border: "rgba(255, 255, 255, 0.08)",
+    playerBackground: "#13121F",
+    miniPlayerBackground: "rgba(24, 22, 38, 0.92)",
+    danger: "#F43F5E",
+    favorite: "#F472B6",
+    glass: "rgba(255, 255, 255, 0.06)",
+    glassStrong: "rgba(30, 28, 48, 0.92)",
+    glassBorder: "rgba(255, 255, 255, 0.10)",
+    glowPrimary: "rgba(139, 92, 246, 0.30)",
+    glowSecondary: "rgba(236, 72, 153, 0.20)",
   },
 };
+
+export type ThemeColors = (typeof Colors)["dark"];
+
+export const NeonGradient = ["#8B5CF6", "#EC4899"] as const;
 
 export const Spacing = {
   xs: 4,
@@ -57,6 +74,15 @@ export const BorderRadius = {
   xl: 24,
   full: 9999,
 };
+
+// Soft neon glow for highlighted elements (play button, active items).
+export const neonShadow = (color = "#A855F7") => ({
+  shadowColor: color,
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.55,
+  shadowRadius: 16,
+  elevation: 12,
+});
 
 export const Fonts = Platform.select({
   ios: {

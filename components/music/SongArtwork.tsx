@@ -42,7 +42,12 @@ export function SongArtwork({
   ];
 
   if (song.artwork) {
-    return <Image source={{ uri: song.artwork }} style={boxStyle as StyleProp<ImageStyle>} />;
+    return (
+      <Image
+        source={{ uri: song.artwork }}
+        style={boxStyle as StyleProp<ImageStyle>}
+      />
+    );
   }
 
   return (

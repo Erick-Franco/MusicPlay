@@ -1,16 +1,15 @@
 import { SongItem } from "@/components/music/SongItem";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { GradientIconButton } from "@/components/ui/GradientIconButton";
 import { Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";
-import {
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  FadeInDown,
+  LinearTransition,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function FavoritesScreen() {
@@ -25,76 +24,62 @@ export default function FavoritesScreen() {
   }, [songs, favoriteIds]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
+    <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Favoritos
-        </Text>
-        <View style={styles.headerActions}>
-          <Text style={[styles.count, { color: colors.textSecondary }]}>
-            {favoriteSongs.length}
+        <View>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Favoritos
           </Text>
-          <TouchableOpacity
-            onPress={() => shufflePlay(favoriteSongs)}
-            disabled={favoriteSongs.length === 0}
-            style={styles.shuffleBtn}
-            accessibilityLabel="Reproducir favoritos en aleatorio"
-          >
-            <Ionicons
-              name="shuffle"
-              size={22}
-              color={
-                favoriteSongs.length > 0
-                  ? colors.accent
-                  : colors.textSecondary
-              }
-            />
-          </TouchableOpacity>
-          <Ionicons name="heart" size={24} color={colors.favorite} />
+          <Text style={[styles.count, { color: colors.textSecondary }]}>
+            {favoriteSongs.length}{" "}
+            {favoriteSongs.length === 1 ? "canción" : "canciones"}
+          </Text>
         </View>
+        {favoriteSongs.length > 0 && (
+          <GradientIconButton
+            icon="shuffle"
+            size={46}
+            onPress={() => shufflePlay(favoriteSongs)}
+            accessibilityLabel="Reproducir favoritos en aleatorio"
+          />
+        )}
       </View>
 
-      {favoriteSongs.length === 0 ? (
-        <View style={styles.empty}>
-          <Ionicons
-            name="heart-outline"
-            size={64}
-            color={colors.textSecondary}
-          />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            Sin favoritos
-          </Text>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Toca el corazón en cualquier canción para agregarla aquí
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={favoriteSongs}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
+      <FlatList
+        data={favoriteSongs}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item, index }) => (
+          <Animated.View
+            entering={
+              index < 12
+                ? FadeInDown.delay(index * 30).duration(280)
+                : undefined
+            }
+            layout={LinearTransition.springify().damping(18)}
+          >
             <SongItem
               song={item}
               isActive={currentSong?.id === item.id}
               onPress={() => playSong(item, favoriteSongs)}
             />
-          )}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: insets.bottom -45 },
-          ]}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+          </Animated.View>
+        )}
+        ListEmptyComponent={
+          <EmptyState
+            icon="heart-outline"
+            title="Sin favoritos"
+            subtitle="Toca el corazón en cualquier canción para agregarla aquí."
+          />
+        }
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -102,40 +87,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
   },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  count: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  shuffleBtn: {
-    padding: Spacing.xs,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-  },
-  empty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.md,
-    paddingBottom: 100,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginTop: Spacing.md,
-  },
-  emptyText: {
-    fontSize: 15,
-    textAlign: "center",
-    paddingHorizontal: Spacing.xxl,
-  },
-  listContent: {
-    paddingBottom: 120,
-  },
+  headerTitle: { fontSize: 32, fontWeight: "800", letterSpacing: -0.5 },
+  count: { fontSize: 13, marginTop: 2 },
+  listContent: { paddingBottom: Spacing.lg, flexGrow: 1 },
 });

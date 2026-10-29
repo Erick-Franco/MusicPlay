@@ -1,19 +1,23 @@
-import { BorderRadius, Colors, Spacing } from "@/constants/theme";
+import { GlassIconButton } from "@/components/ui/GlassIconButton";
+import { GradientPill } from "@/components/ui/PlayShuffleButtons";
+import { PressableScale } from "@/components/ui/PressableScale";
+import { ScreenBackground } from "@/components/ui/ScreenBackground";
+import { BorderRadius, Colors, NeonGradient, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { formatDuration } from "@/utils/musicScanner";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo, useState } from "react";
-import {
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from "react-native";
+import { FlatList, Modal, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  FadeInDown,
+  FadeOutDown,
+  ZoomIn,
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SearchBar } from "./SearchBar";
 import { SongArtwork } from "./SongArtwork";
 
 interface AddSongsToPlaylistModalProps {
@@ -29,6 +33,7 @@ export function AddSongsToPlaylistModal({
 }: AddSongsToPlaylistModalProps) {
   const colorScheme = useColorScheme() ?? "dark";
   const colors = Colors[colorScheme];
+  const insets = useSafeAreaInsets();
   const { songs, playlists, addSongToPlaylist } = useMusicPlayer();
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -71,46 +76,30 @@ export function AddSongsToPlaylistModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={handleClose}>
-            <Ionicons name="close" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>
-            Agregar canciones
-          </Text>
-          <TouchableOpacity
-            onPress={handleAdd}
-            disabled={selectedIds.size === 0}
-          >
-            <Text
-              style={[
-                styles.addBtn,
-                {
-                  color:
-                    selectedIds.size > 0 ? colors.accent : colors.textSecondary,
-                },
-              ]}
-            >
-              Agregar ({selectedIds.size})
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Search */}
-        <View style={[styles.searchBar, { backgroundColor: colors.card }]}>
-          <Ionicons name="search" size={18} color={colors.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Buscar canciones..."
-            placeholderTextColor={colors.textSecondary}
+      <ScreenBackground style={{ paddingTop: insets.top }}>
+        <View style={styles.header}>
+          <GlassIconButton
+            icon="close"
+            onPress={handleClose}
+            accessibilityLabel="Cerrar"
           />
+          <View style={styles.headerInfo}>
+            <Text style={[styles.title, { color: colors.text }]}>
+              Agregar canciones
+            </Text>
+            {playlist && (
+              <Text
+                style={[styles.subtitle, { color: colors.textSecondary }]}
+                numberOfLines={1}
+              >
+                a {playlist.name}
+              </Text>
+            )}
+          </View>
         </View>
 
-        {/* Song list */}
+        <SearchBar value={search} onChangeText={setSearch} />
+
         <FlatList
           data={filteredSongs}
           keyExtractor={(item) => item.id}
@@ -118,49 +107,53 @@ export function AddSongsToPlaylistModal({
             const alreadyIn = existingSongIds.has(item.id);
             const isSelected = selectedIds.has(item.id);
             return (
-              <TouchableOpacity
-                style={[styles.songRow, { borderBottomColor: colors.border }]}
+              <PressableScale
+                pressedScale={0.98}
+                style={[
+                  styles.songRow,
+                  isSelected && {
+                    backgroundColor: colors.glass,
+                    borderColor: colors.accent + "66",
+                  },
+                  alreadyIn && styles.disabled,
+                ]}
                 onPress={() => !alreadyIn && toggleSelect(item.id)}
                 disabled={alreadyIn}
-                activeOpacity={0.7}
               >
-                {/* Checkbox */}
-                <View
-                  style={[
-                    styles.checkbox,
-                    {
-                      borderColor: alreadyIn
-                        ? colors.textSecondary
-                        : isSelected
-                          ? colors.accent
-                          : colors.border,
-                      backgroundColor: isSelected
-                        ? colors.accent
-                        : alreadyIn
-                          ? colors.card
-                          : "transparent",
-                    },
-                  ]}
-                >
-                  {(isSelected || alreadyIn) && (
-                    <Ionicons
-                      name="checkmark"
-                      size={14}
-                      color={alreadyIn ? colors.textSecondary : "#FFF"}
-                    />
-                  )}
-                </View>
+                {isSelected || alreadyIn ? (
+                  <Animated.View entering={ZoomIn.springify().damping(12)}>
+                    <LinearGradient
+                      colors={
+                        alreadyIn ? [colors.card, colors.card] : NeonGradient
+                      }
+                      style={styles.checkbox}
+                    >
+                      <Ionicons
+                        name="checkmark"
+                        size={14}
+                        color={alreadyIn ? colors.textSecondary : "#FFFFFF"}
+                      />
+                    </LinearGradient>
+                  </Animated.View>
+                ) : (
+                  <View
+                    style={[
+                      styles.checkbox,
+                      styles.checkboxEmpty,
+                      { borderColor: colors.textSecondary },
+                    ]}
+                  />
+                )}
 
-                {/* Artwork */}
-                <SongArtwork song={item} size={40} />
+                <SongArtwork
+                  song={item}
+                  size={44}
+                  borderRadius={BorderRadius.md}
+                />
 
-                {/* Info */}
                 <View style={styles.info}>
                   <Text
-                    style={[
-                      styles.songTitle,
-                      { color: alreadyIn ? colors.textSecondary : colors.text },
-                    ]}
+                    style={[styles.songTitle, { color: colors.text }]}
                     numberOfLines={1}
                   >
                     {item.title}
@@ -169,7 +162,7 @@ export function AddSongsToPlaylistModal({
                     style={[styles.songArtist, { color: colors.textSecondary }]}
                     numberOfLines={1}
                   >
-                    {item.artist}
+                    {alreadyIn ? "Ya está en la playlist" : item.artist}
                   </Text>
                 </View>
 
@@ -178,82 +171,66 @@ export function AddSongsToPlaylistModal({
                 >
                   {formatDuration(item.duration)}
                 </Text>
-              </TouchableOpacity>
+              </PressableScale>
             );
           }}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+          keyboardShouldPersistTaps="handled"
         />
-      </View>
+
+        {/* Floating confirm button appears once something is selected */}
+        {selectedIds.size > 0 && (
+          <Animated.View
+            entering={FadeInDown.springify().damping(16)}
+            exiting={FadeOutDown.duration(150)}
+            style={[styles.confirm, { bottom: insets.bottom + Spacing.lg }]}
+          >
+            <GradientPill
+              icon="add"
+              label={`Agregar ${selectedIds.size} ${selectedIds.size === 1 ? "canción" : "canciones"}`}
+              onPress={handleAdd}
+            />
+          </Animated.View>
+        )}
+      </ScreenBackground>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    paddingTop: 50,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.md,
   },
-  title: {
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  addBtn: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    margin: Spacing.lg,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
-    height: 40,
-    gap: Spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    height: "100%",
-  },
+  headerInfo: { flex: 1 },
+  title: { fontSize: 20, fontWeight: "800" },
+  subtitle: { fontSize: 13, marginTop: 2 },
   songRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: "transparent",
     gap: Spacing.md,
   },
+  disabled: { opacity: 0.5 },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  info: {
-    flex: 1,
-    gap: 2,
-  },
-  songTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  songArtist: {
-    fontSize: 12,
-  },
-  duration: {
-    fontSize: 12,
-  },
-  listContent: {
-    paddingBottom: 40,
-  },
+  checkboxEmpty: { borderWidth: 2 },
+  info: { flex: 1, gap: 2 },
+  songTitle: { fontSize: 15, fontWeight: "600" },
+  songArtist: { fontSize: 12 },
+  duration: { fontSize: 12, fontVariant: ["tabular-nums"] },
+  confirm: { position: "absolute", alignSelf: "center" },
 });

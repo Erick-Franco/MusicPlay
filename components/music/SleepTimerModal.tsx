@@ -1,16 +1,11 @@
-import { BorderRadius, Colors, Spacing } from "@/constants/theme";
+import { GlassSheet } from "@/components/ui/GlassSheet";
+import { PressableScale } from "@/components/ui/PressableScale";
+import { BorderRadius, Colors, NeonGradient, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
-import {
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 interface SleepTimerModalProps {
   visible: boolean;
@@ -18,13 +13,14 @@ interface SleepTimerModalProps {
 }
 
 const TIMER_OPTIONS = [
-  { label: "5 minutos", minutes: 5 },
-  { label: "10 minutos", minutes: 10 },
-  { label: "15 minutos", minutes: 15 },
-  { label: "30 minutos", minutes: 30 },
-  { label: "45 minutos", minutes: 45 },
-  { label: "1 hora", minutes: 60 },
-  { label: "2 horas", minutes: 120 },
+  { label: "5", unit: "min", minutes: 5 },
+  { label: "10", unit: "min", minutes: 10 },
+  { label: "15", unit: "min", minutes: 15 },
+  { label: "30", unit: "min", minutes: 30 },
+  { label: "45", unit: "min", minutes: 45 },
+  { label: "1", unit: "hora", minutes: 60 },
+  { label: "1.5", unit: "horas", minutes: 90 },
+  { label: "2", unit: "horas", minutes: 120 },
 ];
 
 export function SleepTimerModal({ visible, onClose }: SleepTimerModalProps) {
@@ -42,126 +38,109 @@ export function SleepTimerModal({ visible, onClose }: SleepTimerModalProps) {
   };
 
   return (
-    <Modal
+    <GlassSheet
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      title="Temporizador de sueño"
+      icon="moon"
     >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View style={[styles.container, { backgroundColor: colors.surface }]}>
-          <View style={styles.header}>
-            <Ionicons name="moon-outline" size={24} color={colors.accent} />
-            <Text style={[styles.title, { color: colors.text }]}>
-              Temporizador de sueño
+      {isActive && (
+        <LinearGradient
+          colors={[NeonGradient[0] + "33", NeonGradient[1] + "22"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.activeTimer, { borderColor: colors.glassBorder }]}
+        >
+          <Text style={[styles.activeLabel, { color: colors.textSecondary }]}>
+            La música se detendrá en
+          </Text>
+          <Text style={[styles.activeTime, { color: colors.text }]}>
+            {formatRemaining(sleepTimerRemaining!)}
+          </Text>
+          <Pressable
+            style={[styles.cancelBtn, { borderColor: colors.danger + "80" }]}
+            onPress={() => {
+              cancelSleepTimer();
+              onClose();
+            }}
+          >
+            <Text style={[styles.cancelText, { color: colors.danger }]}>
+              Cancelar temporizador
             </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
+          </Pressable>
+        </LinearGradient>
+      )}
 
-          {isActive && (
-            <View
-              style={[
-                styles.activeTimer,
-                { backgroundColor: colors.accent + "15" },
-              ]}
-            >
-              <Text style={[styles.activeLabel, { color: colors.accent }]}>
-                Temporizador activo
-              </Text>
-              <Text style={[styles.activeTime, { color: colors.accent }]}>
-                {formatRemaining(sleepTimerRemaining!)}
-              </Text>
-              <TouchableOpacity
-                style={[styles.cancelBtn, { borderColor: colors.danger }]}
-                onPress={() => {
-                  cancelSleepTimer();
-                  onClose();
-                }}
-              >
-                <Text style={[styles.cancelText, { color: colors.danger }]}>
-                  Cancelar
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <ScrollView>
-            {TIMER_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.minutes}
-                style={[styles.option, { borderBottomColor: colors.border }]}
-                onPress={() => {
-                  setSleepTimer(option.minutes);
-                  onClose();
-                }}
-              >
-                <Ionicons
-                  name="time-outline"
-                  size={22}
-                  color={colors.textSecondary}
-                />
-                <Text style={[styles.optionText, { color: colors.text }]}>
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </TouchableOpacity>
-    </Modal>
+      <View style={styles.grid}>
+        {TIMER_OPTIONS.map((option) => (
+          <PressableScale
+            key={option.minutes}
+            haptic
+            style={[
+              styles.option,
+              {
+                backgroundColor: colors.glass,
+                borderColor: colors.glassBorder,
+              },
+            ]}
+            onPress={() => {
+              setSleepTimer(option.minutes);
+              onClose();
+            }}
+          >
+            <Text style={[styles.optionValue, { color: colors.text }]}>
+              {option.label}
+            </Text>
+            <Text style={[styles.optionUnit, { color: colors.textSecondary }]}>
+              {option.unit}
+            </Text>
+          </PressableScale>
+        ))}
+      </View>
+    </GlassSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
-  },
-  container: {
-    maxHeight: "65%",
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    paddingBottom: Spacing.xxl,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  title: { flex: 1, fontSize: 18, fontWeight: "700" },
   activeTimer: {
     alignItems: "center",
-    margin: Spacing.lg,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
-    gap: Spacing.sm,
+    borderWidth: 1,
+    gap: Spacing.xs,
   },
-  activeLabel: { fontSize: 14, fontWeight: "600" },
-  activeTime: { fontSize: 36, fontWeight: "800" },
+  activeLabel: { fontSize: 13, fontWeight: "600" },
+  activeTime: {
+    fontSize: 44,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -1,
+  },
   cancelBtn: {
     borderWidth: 1,
     borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 6,
     marginTop: Spacing.xs,
   },
-  cancelText: { fontSize: 14, fontWeight: "600" },
-  option: {
+  cancelText: { fontSize: 13, fontWeight: "700" },
+  grid: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: Spacing.md,
+    flexWrap: "wrap",
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
   },
-  optionText: { fontSize: 16, fontWeight: "500" },
+  option: {
+    width: "23%",
+    flexGrow: 1,
+    aspectRatio: 1,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  optionValue: { fontSize: 22, fontWeight: "800" },
+  optionUnit: { fontSize: 12, marginTop: 2 },
 });

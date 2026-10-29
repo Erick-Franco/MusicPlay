@@ -1,11 +1,14 @@
-import { Colors, Spacing } from "@/constants/theme";
+import { AnimatedHeart } from "@/components/ui/AnimatedHeart";
+import { EqualizerBars } from "@/components/ui/EqualizerBars";
+import { PressableScale } from "@/components/ui/PressableScale";
+import { BorderRadius, Colors, NeonGradient, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Song } from "@/types/types";
 import { formatDuration } from "@/utils/musicScanner";
-import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { SongArtwork } from "./SongArtwork";
 
@@ -38,27 +41,42 @@ export function SongItem({
     onToggleFavorite || (() => ctx.toggleFavorite(song.id));
 
   return (
-    <TouchableOpacity
+    <PressableScale
+      pressedScale={0.97}
       style={[
         styles.container,
-        {
-          backgroundColor: isActive ? colors.accent + "15" : "transparent",
-          borderBottomColor: colors.border,
+        isActive && {
+          backgroundColor: colors.glass,
+          borderColor: colors.glassBorder,
         },
       ]}
       onPress={onPress}
       onLongPress={onLongPress}
-      activeOpacity={0.7}
     >
-      {/* Artwork */}
-      <SongArtwork song={song} size={48} />
+      {/* Neon edge on the playing row */}
+      {isActive && (
+        <LinearGradient
+          colors={NeonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.activeEdge}
+        />
+      )}
 
-      {/* Song info */}
+      <View>
+        <SongArtwork song={song} size={50} borderRadius={BorderRadius.md} />
+        {isActive && (
+          <View style={styles.artworkOverlay}>
+            <EqualizerBars playing={ctx.isPlaying} color="#FFFFFF" size={16} />
+          </View>
+        )}
+      </View>
+
       <View style={styles.info}>
         <Text
           style={[
             styles.title,
-            { color: isActive ? colors.accent : colors.text },
+            { color: isActive ? colors.tabIconSelected : colors.text },
           ]}
           numberOfLines={1}
         >
@@ -72,22 +90,19 @@ export function SongItem({
         </Text>
       </View>
 
-      {/* Duration */}
       <Text style={[styles.duration, { color: colors.textSecondary }]}>
         {formatDuration(song.duration)}
       </Text>
 
-      {/* Favorite */}
       {showFavorite && (
-        <TouchableOpacity onPress={handleFavorite} style={styles.favoriteBtn}>
-          <Ionicons
-            name={fav ? "heart" : "heart-outline"}
-            size={22}
-            color={fav ? colors.favorite : colors.textSecondary}
-          />
-        </TouchableOpacity>
+        <AnimatedHeart
+          active={fav}
+          onPress={handleFavorite}
+          size={20}
+          style={styles.favoriteBtn}
+        />
       )}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -95,14 +110,33 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: "transparent",
     gap: Spacing.md,
+    overflow: "hidden",
   },
-  info: { flex: 1, gap: 2 },
+  activeEdge: {
+    position: "absolute",
+    left: 0,
+    top: 10,
+    bottom: 10,
+    width: 3,
+    borderRadius: 2,
+  },
+  artworkOverlay: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: BorderRadius.md,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  info: { flex: 1, gap: 3 },
   title: { fontSize: 15, fontWeight: "600" },
   artist: { fontSize: 13 },
-  duration: { fontSize: 13, marginRight: Spacing.xs },
+  duration: { fontSize: 12, fontVariant: ["tabular-nums"] },
   favoriteBtn: { padding: Spacing.xs },
 });

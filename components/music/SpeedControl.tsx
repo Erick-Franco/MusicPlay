@@ -1,11 +1,9 @@
+import { PressableScale } from "@/components/ui/PressableScale";
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
-import {
-  PLAYBACK_RATES,
-  useMusicPlayer,
-} from "@/contexts/MusicPlayerContext";
+import { PLAYBACK_RATES, useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity } from "react-native";
+import { StyleSheet, Text } from "react-native";
 
 function formatRate(rate: number): string {
   return rate % 1 === 0 ? `${rate}.0x` : `${rate}x`;
@@ -15,6 +13,7 @@ export function SpeedControl() {
   const colorScheme = useColorScheme() ?? "dark";
   const colors = Colors[colorScheme];
   const { playbackRate, setPlaybackRate } = useMusicPlayer();
+  const isDefault = playbackRate === 1;
 
   const cycleRate = () => {
     const idx = PLAYBACK_RATES.indexOf(playbackRate);
@@ -23,18 +22,27 @@ export function SpeedControl() {
   };
 
   return (
-    <TouchableOpacity
+    <PressableScale
       onPress={cycleRate}
-      activeOpacity={0.7}
+      haptic
+      accessibilityLabel="Velocidad de reproducción"
       style={[
         styles.pill,
-        { backgroundColor: colors.card, borderColor: colors.border },
+        {
+          backgroundColor: isDefault ? colors.glass : colors.accent + "26",
+          borderColor: isDefault ? colors.glassBorder : colors.accent + "80",
+        },
       ]}
     >
-      <Text style={[styles.text, { color: colors.accent }]}>
+      <Text
+        style={[
+          styles.text,
+          { color: isDefault ? colors.textSecondary : colors.tabIconSelected },
+        ]}
+      >
         {formatRate(playbackRate)}
       </Text>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
