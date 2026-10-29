@@ -1,7 +1,24 @@
 import { AddSongsToPlaylistModal } from "@/components/music/AddSongsToPlaylistModal";
 import { MiniPlayer } from "@/components/music/MiniPlayer";
+import { PlaylistCover } from "@/components/music/PlaylistCard";
 import { SongArtwork } from "@/components/music/SongArtwork";
-import { BorderRadius, Colors, Spacing } from "@/constants/theme";
+import { AnimatedHeart } from "@/components/ui/AnimatedHeart";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { EqualizerBars } from "@/components/ui/EqualizerBars";
+import { GlassIconButton } from "@/components/ui/GlassIconButton";
+import {
+  GradientPill,
+  PlayShuffleButtons,
+} from "@/components/ui/PlayShuffleButtons";
+import { PressableScale } from "@/components/ui/PressableScale";
+import { ScreenBackground } from "@/components/ui/ScreenBackground";
+import {
+  BorderRadius,
+  Colors,
+  NeonGradient,
+  Spacing,
+  neonShadow,
+} from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Song } from "@/types/types";
@@ -12,12 +29,12 @@ import { memo, useCallback, useMemo, useState } from "react";
 import {
   Alert,
   ListRenderItemInfo,
+  Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import ReorderableList, {
   ReorderableListReorderEvent,
   useIsActive,
@@ -29,6 +46,7 @@ interface PlaylistSongRowProps {
   item: Song;
   index: number;
   isCurrentPlaying: boolean;
+  isPlaying: boolean;
   isFavoriteSong: boolean;
   onPress: (song: Song) => void;
   onLongPress: (songId: string, songTitle: string) => void;
@@ -39,6 +57,7 @@ const PlaylistSongRow = memo(function PlaylistSongRow({
   item,
   index,
   isCurrentPlaying,
+  isPlaying,
   isFavoriteSong,
   onPress,
   onLongPress,
@@ -50,31 +69,33 @@ const PlaylistSongRow = memo(function PlaylistSongRow({
   const isActive = useIsActive();
 
   return (
-    <TouchableOpacity
+    <PressableScale
+      pressedScale={0.98}
       style={[
         styles.songRow,
-        {
-          borderBottomColor: colors.border,
-          backgroundColor: isActive
-            ? colors.accent + "25"
-            : isCurrentPlaying
-              ? colors.accent + "10"
-              : "transparent",
+        (isActive || isCurrentPlaying) && {
+          backgroundColor: isActive ? colors.glassStrong : colors.glass,
+          borderColor: isActive ? colors.accent + "80" : colors.glassBorder,
         },
+        isActive && neonShadow(colors.accent),
       ]}
       onPress={() => onPress(item)}
       onLongPress={() => onLongPress(item.id, item.title)}
       delayLongPress={250}
-      activeOpacity={0.7}
     >
-      {/* Artwork */}
-      <SongArtwork song={item} size={44} />
-      {/* Info */}
+      <View>
+        <SongArtwork song={item} size={46} borderRadius={BorderRadius.md} />
+        {isCurrentPlaying && (
+          <View style={styles.artworkOverlay}>
+            <EqualizerBars playing={isPlaying} color="#FFFFFF" size={14} />
+          </View>
+        )}
+      </View>
       <View style={styles.songInfo}>
         <Text
           style={[
             styles.songTitle,
-            { color: isCurrentPlaying ? colors.accent : colors.text },
+            { color: isCurrentPlaying ? colors.tabIconSelected : colors.text },
           ]}
           numberOfLines={1}
         >
@@ -84,55 +105,39 @@ const PlaylistSongRow = memo(function PlaylistSongRow({
           style={[styles.songArtist, { color: colors.textSecondary }]}
           numberOfLines={1}
         >
-          {item.artist}
+          {index + 1} · {item.artist} · {formatDuration(item.duration)}
         </Text>
       </View>
-      {/* Duration */}
-      <Text style={[styles.songDuration, { color: colors.textSecondary }]}>
-        {formatDuration(item.duration)}
-      </Text>
-      {/* Index */}
-      <Text
-        style={[
-          styles.indexLabel,
-          {
-            color: isCurrentPlaying ? colors.accent : colors.textSecondary,
-          },
-        ]}
-      >
-        {index + 1}
-      </Text>
-      {/* Favorite */}
-      <TouchableOpacity
+      <AnimatedHeart
+        active={isFavoriteSong}
         onPress={() => onToggleFavorite(item.id)}
+        size={20}
         style={styles.actionBtn}
-      >
-        <Ionicons
-          name={isFavoriteSong ? "heart" : "heart-outline"}
-          size={20}
-          color={isFavoriteSong ? colors.favorite : colors.textSecondary}
-        />
-      </TouchableOpacity>
-      {/* Menu */}
-      <TouchableOpacity
+      />
+      <Pressable
         onPress={() => onLongPress(item.id, item.title)}
+        hitSlop={6}
         style={styles.actionBtn}
+        accessibilityLabel="Opciones"
       >
         <Ionicons
           name="ellipsis-vertical"
           size={18}
           color={colors.textSecondary}
         />
-      </TouchableOpacity>
-      {/* Drag handle */}
-      <TouchableOpacity
+      </Pressable>
+      <Pressable
         onPressIn={drag}
         style={styles.dragHandle}
         accessibilityLabel="Reordenar"
       >
-        <Ionicons name="reorder-three" size={24} color={colors.textSecondary} />
-      </TouchableOpacity>
-    </TouchableOpacity>
+        <Ionicons
+          name="reorder-three"
+          size={24}
+          color={isActive ? colors.tabIconSelected : colors.textSecondary}
+        />
+      </Pressable>
+    </PressableScale>
   );
 });
 
@@ -155,6 +160,7 @@ export default function PlaylistDetailScreen() {
     isShuffleOn,
     toggleFavorite,
     isFavorite,
+    isPlaying,
   } = useMusicPlayer();
   const [showAddSongs, setShowAddSongs] = useState(false);
 
@@ -232,6 +238,7 @@ export default function PlaylistDetailScreen() {
         item={item}
         index={index}
         isCurrentPlaying={currentSong?.id === item.id}
+        isPlaying={isPlaying}
         isFavoriteSong={isFavorite(item.id)}
         onPress={handlePlay}
         onLongPress={handleSongMenu}
@@ -240,6 +247,7 @@ export default function PlaylistDetailScreen() {
     ),
     [
       currentSong,
+      isPlaying,
       isFavorite,
       handlePlay,
       handleSongMenu,
@@ -249,220 +257,158 @@ export default function PlaylistDetailScreen() {
 
   if (!playlist) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.notFound, { color: colors.textSecondary }]}>
-          Playlist no encontrada
-        </Text>
-      </View>
+      <ScreenBackground style={{ paddingTop: insets.top }}>
+        <View style={styles.header}>
+          <GlassIconButton icon="arrow-back" onPress={() => router.back()} />
+        </View>
+        <EmptyState
+          icon="alert-circle-outline"
+          title="Playlist no encontrada"
+        />
+      </ScreenBackground>
     );
   }
 
-  return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View
-        style={[
-          styles.container,
-          { backgroundColor: colors.background, paddingTop: insets.top },
-        ]}
+  const listHeader = (
+    <Animated.View entering={FadeInDown.duration(400)} style={styles.hero}>
+      <View style={neonShadow(NeonGradient[0])}>
+        <PlaylistCover songIds={playlist.songIds} size={170} />
+      </View>
+      <Text
+        style={[styles.heroTitle, { color: colors.text }]}
+        numberOfLines={2}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backBtn}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <View style={styles.headerInfo}>
-            <Text
-              style={[styles.headerTitle, { color: colors.text }]}
-              numberOfLines={1}
-            >
-              {playlist.name}
-            </Text>
-            <Text style={[styles.headerCount, { color: colors.textSecondary }]}>
-              {playlistSongs.length}{" "}
-              {playlistSongs.length === 1 ? "canción" : "canciones"}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setShowAddSongs(true)}
-            style={[styles.addBtn, { backgroundColor: colors.accent }]}
-          >
-            <Ionicons name="add" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
+        {playlist.name}
+      </Text>
+      <Text style={[styles.heroCount, { color: colors.textSecondary }]}>
+        {playlistSongs.length}{" "}
+        {playlistSongs.length === 1 ? "canción" : "canciones"}
+      </Text>
+
+      {playlistSongs.length > 0 && (
+        <View style={styles.controlsRow}>
+          <PlayShuffleButtons
+            onPlay={() => playPlaylist(playlist)}
+            onShuffle={handleShufflePlay}
+          />
         </View>
+      )}
+    </Animated.View>
+  );
 
-        {/* Playback controls */}
-        {playlistSongs.length > 0 && (
-          <View style={styles.controlsRow}>
-            <TouchableOpacity
-              style={[styles.playAllBtn, { backgroundColor: colors.accent }]}
-              onPress={() => playPlaylist(playlist)}
-            >
-              <Ionicons name="play" size={20} color="#FFFFFF" />
-              <Text style={styles.playAllText}>Reproducir</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.shuffleBtn,
-                { backgroundColor: colors.card, borderColor: colors.accent },
-              ]}
-              onPress={handleShufflePlay}
-            >
-              <Ionicons name="shuffle" size={20} color={colors.accent} />
-              <Text style={[styles.shuffleText, { color: colors.accent }]}>
-                Aleatorio
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Songs - Draggable */}
-        {playlistSongs.length === 0 ? (
-          <View style={styles.empty}>
-            <Ionicons
-              name="musical-notes-outline"
-              size={48}
-              color={colors.textSecondary}
-            />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Esta playlist está vacía
-            </Text>
-            <TouchableOpacity
-              style={[styles.addSongsBtn, { backgroundColor: colors.accent }]}
-              onPress={() => setShowAddSongs(true)}
-            >
-              <Ionicons name="add" size={20} color="#FFFFFF" />
-              <Text style={styles.addSongsBtnText}>Agregar canciones</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={{ flex: 1 }}>
-            <ReorderableList
-              data={playlistSongs}
-              keyExtractor={keyExtractor}
-              renderItem={renderSongItem}
-              onReorder={handleReorder}
-              contentContainerStyle={[
-                styles.listContent,
-                { paddingBottom: insets.bottom - 45 },
-              ]}
-              showsVerticalScrollIndicator={false}
-              shouldUpdateActiveItem
-            />
-          </View>
-        )}
-
-        {/* MiniPlayer - Fixed at bottom */}
-        {currentSong && <MiniPlayer />}
-
-        {/* Add Songs Modal */}
-        <AddSongsToPlaylistModal
-          visible={showAddSongs}
-          onClose={() => setShowAddSongs(false)}
-          playlistId={playlist.id}
+  return (
+    <ScreenBackground style={{ paddingTop: insets.top }}>
+      <View style={styles.header}>
+        <GlassIconButton
+          icon="arrow-back"
+          onPress={() => router.back()}
+          accessibilityLabel="Volver"
+        />
+        <GlassIconButton
+          icon="add"
+          onPress={() => setShowAddSongs(true)}
+          accessibilityLabel="Agregar canciones"
         />
       </View>
-    </GestureHandlerRootView>
+
+      {playlistSongs.length === 0 ? (
+        <>
+          {listHeader}
+          <EmptyState
+            icon="musical-notes-outline"
+            title="Esta playlist está vacía"
+            subtitle="Agrega canciones de tu biblioteca."
+          >
+            <GradientPill
+              icon="add"
+              label="Agregar canciones"
+              onPress={() => setShowAddSongs(true)}
+            />
+          </EmptyState>
+        </>
+      ) : (
+        <View style={{ flex: 1 }}>
+          <ReorderableList
+            data={playlistSongs}
+            keyExtractor={keyExtractor}
+            renderItem={renderSongItem}
+            onReorder={handleReorder}
+            ListHeaderComponent={listHeader}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            shouldUpdateActiveItem
+          />
+        </View>
+      )}
+
+      {currentSong && (
+        <View
+          style={[
+            styles.miniPlayer,
+            { paddingBottom: Math.max(insets.bottom, Spacing.sm) },
+          ]}
+        >
+          <MiniPlayer />
+        </View>
+      )}
+
+      <AddSongsToPlaylistModal
+        visible={showAddSongs}
+        onClose={() => setShowAddSongs(false)}
+        playlistId={playlist.id}
+      />
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  notFound: {
-    flex: 1,
-    textAlign: "center",
-    textAlignVertical: "center",
-    fontSize: 16,
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-    gap: Spacing.md,
-  },
-  backBtn: { padding: Spacing.sm },
-  headerInfo: { flex: 1, gap: 2 },
-  headerTitle: { fontSize: 22, fontWeight: "700" },
-  headerCount: { fontSize: 13 },
-  addBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  controlsRow: {
-    flexDirection: "row",
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    gap: Spacing.sm,
-  },
-  playAllBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    gap: Spacing.sm,
   },
-  playAllText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
-  shuffleBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    gap: Spacing.sm,
-    borderWidth: 1.5,
-  },
-  shuffleText: { fontSize: 15, fontWeight: "600" },
-  empty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.xxl,
-    paddingBottom: 100,
-  },
-  emptyText: { fontSize: 15, textAlign: "center" },
-  addSongsBtn: {
-    flexDirection: "row",
+  hero: {
     alignItems: "center",
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.full,
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
+    paddingBottom: Spacing.lg,
   },
-  addSongsBtnText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+    textAlign: "center",
+    marginTop: Spacing.lg,
+  },
+  heroCount: { fontSize: 14, marginTop: 4 },
+  controlsRow: { marginTop: Spacing.lg },
   songRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: "transparent",
     gap: Spacing.sm,
   },
+  artworkOverlay: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: BorderRadius.md,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   dragHandle: {
-    paddingLeft: Spacing.sm,
-    paddingRight: Spacing.xs,
+    paddingLeft: Spacing.xs,
     paddingVertical: Spacing.sm,
   },
-  indexLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    width: 22,
-    textAlign: "center",
-  },
-  songInfo: { flex: 1, gap: 2 },
-  songTitle: { fontSize: 14, fontWeight: "600" },
+  songInfo: { flex: 1, gap: 3, marginLeft: Spacing.xs },
+  songTitle: { fontSize: 15, fontWeight: "600" },
   songArtist: { fontSize: 12 },
-  songDuration: { fontSize: 12, marginRight: 2 },
   actionBtn: { padding: 4 },
-  listContent: { paddingBottom: 20 },
+  listContent: { paddingBottom: Spacing.lg },
+  miniPlayer: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm },
 });

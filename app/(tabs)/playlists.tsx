@@ -1,20 +1,25 @@
 import { CreatePlaylistModal } from "@/components/music/CreatePlaylistModal";
 import { PlaylistCard } from "@/components/music/PlaylistCard";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { GradientIconButton } from "@/components/ui/GradientIconButton";
+import { PressableScale } from "@/components/ui/PressableScale";
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Playlist } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
+  ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function PlaylistsScreen() {
@@ -49,7 +54,7 @@ export default function PlaylistsScreen() {
         name: "Reproducidas recientemente",
         icon: "time-outline",
         songIds: recentSongIds.slice(0, 25),
-        color: "#4ECDC4",
+        color: "#06B6D4",
       });
     }
 
@@ -64,7 +69,7 @@ export default function PlaylistsScreen() {
         name: "Más escuchadas",
         icon: "trending-up-outline",
         songIds: mostPlayed,
-        color: "#FF6B6B",
+        color: "#EC4899",
       });
     }
 
@@ -78,7 +83,7 @@ export default function PlaylistsScreen() {
           .slice(-20)
           .reverse()
           .map((s) => s.id),
-        color: "#7C4DFF",
+        color: "#8B5CF6",
       });
     }
 
@@ -105,23 +110,32 @@ export default function PlaylistsScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Playlists
         </Text>
-        <TouchableOpacity
+        <GradientIconButton
+          icon="add"
+          size={38}
           onPress={() => setShowCreate(true)}
-          style={[styles.createBtn, { backgroundColor: colors.accent }]}
-        >
-          <Ionicons name="add" size={22} color="#FFF" />
-        </TouchableOpacity>
+          accessibilityLabel="Crear playlist"
+        />
       </View>
 
       <FlatList
-        data={[]}
-        renderItem={() => null}
-        ListHeaderComponent={() => (
+        data={playlists}
+        keyExtractor={(p) => p.id}
+        renderItem={({ item, index }) => (
+          <Animated.View entering={FadeInDown.delay(index * 40).duration(300)}>
+            <PlaylistCard
+              playlist={item}
+              onPress={() => router.push(`/playlist/${item.id}`)}
+              onDelete={() => handleDeletePlaylist(item)}
+            />
+          </Animated.View>
+        )}
+        ListHeaderComponent={
           <>
             {/* Smart Playlists */}
             {smartPlaylists.length > 0 && (
@@ -129,86 +143,71 @@ export default function PlaylistsScreen() {
                 <Text
                   style={[styles.sectionTitle, { color: colors.textSecondary }]}
                 >
-                  Playlists Inteligentes
+                  Para ti
                 </Text>
-                {smartPlaylists.map((sp) => (
-                  <TouchableOpacity
-                    key={sp.id}
-                    style={[styles.smartCard, { backgroundColor: colors.card }]}
-                    onPress={() => handleOpenSmart(sp)}
-                  >
-                    <View
-                      style={[
-                        styles.smartIcon,
-                        { backgroundColor: sp.color + "20" },
-                      ]}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.smartRow}
+                >
+                  {smartPlaylists.map((sp, i) => (
+                    <Animated.View
+                      key={sp.id}
+                      entering={FadeInRight.delay(i * 70)
+                        .springify()
+                        .damping(16)}
                     >
-                      <Ionicons
-                        name={sp.icon as any}
-                        size={22}
-                        color={sp.color}
-                      />
-                    </View>
-                    <View style={styles.smartInfo}>
-                      <Text style={[styles.smartName, { color: colors.text }]}>
-                        {sp.name}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.smartCount,
-                          { color: colors.textSecondary },
-                        ]}
+                      <PressableScale
+                        onPress={() => handleOpenSmart(sp)}
+                        style={styles.smartCard}
                       >
-                        {sp.songIds.length} canciones
-                      </Text>
-                    </View>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={22}
-                      color={colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-                ))}
+                        <LinearGradient
+                          colors={[sp.color, sp.color + "55"]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.smartFill}
+                        >
+                          <View style={styles.smartIcon}>
+                            <Ionicons
+                              name={sp.icon as any}
+                              size={22}
+                              color="#FFFFFF"
+                            />
+                          </View>
+                          <View>
+                            <Text style={styles.smartName} numberOfLines={2}>
+                              {sp.name}
+                            </Text>
+                            <Text style={styles.smartCount}>
+                              {sp.songIds.length}{" "}
+                              {sp.songIds.length === 1
+                                ? "canción"
+                                : "canciones"}
+                            </Text>
+                          </View>
+                        </LinearGradient>
+                      </PressableScale>
+                    </Animated.View>
+                  ))}
+                </ScrollView>
               </View>
             )}
 
-            {/* User Playlists */}
-            <View style={styles.section}>
-              <Text
-                style={[styles.sectionTitle, { color: colors.textSecondary }]}
-              >
-                Mis Playlists
-              </Text>
-              {playlists.length === 0 ? (
-                <View style={styles.empty}>
-                  <Ionicons
-                    name="musical-notes-outline"
-                    size={48}
-                    color={colors.textSecondary}
-                  />
-                  <Text
-                    style={[styles.emptyText, { color: colors.textSecondary }]}
-                  >
-                    Crea tu primera playlist
-                  </Text>
-                </View>
-              ) : null}
-            </View>
+            <Text
+              style={[styles.sectionTitle, { color: colors.textSecondary }]}
+            >
+              Mis Playlists
+            </Text>
           </>
-        )}
-        ListFooterComponent={() => (
-          <>
-            {playlists.map((playlist) => (
-              <PlaylistCard
-                key={playlist.id}
-                playlist={playlist}
-                onPress={() => router.push(`/playlist/${playlist.id}`)}
-                onDelete={() => handleDeletePlaylist(playlist)}
-              />
-            ))}
-            
-          </>
-        )}
+        }
+        ListEmptyComponent={
+          <EmptyState
+            icon="albums-outline"
+            title="Crea tu primera playlist"
+            subtitle="Agrupa tus canciones favoritas como quieras."
+          />
+        }
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
 
@@ -233,46 +232,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
   },
-  headerTitle: { fontSize: 28, fontWeight: "800" },
-  createBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  headerTitle: { fontSize: 32, fontWeight: "800", letterSpacing: -0.5 },
   section: { marginBottom: Spacing.md },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "700",
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
   },
-  smartCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
+  smartRow: { paddingHorizontal: Spacing.lg, gap: Spacing.md },
+  smartCard: { borderRadius: BorderRadius.lg },
+  smartFill: {
+    width: 150,
+    height: 150,
+    borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.md,
+    justifyContent: "space-between",
   },
   smartIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.22)",
     alignItems: "center",
     justifyContent: "center",
   },
-  smartInfo: { flex: 1, gap: 2 },
-  smartName: { fontSize: 15, fontWeight: "600" },
-  smartCount: { fontSize: 12 },
-  empty: {
-    alignItems: "center",
-    padding: Spacing.xxl,
-    gap: Spacing.md,
-  },
-  emptyText: { fontSize: 15 },
+  smartName: { fontSize: 15, fontWeight: "800", color: "#FFFFFF" },
+  smartCount: { fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 2 },
+  listContent: { paddingBottom: Spacing.lg },
 });

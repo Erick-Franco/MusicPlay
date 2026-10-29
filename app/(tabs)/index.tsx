@@ -1,6 +1,12 @@
 import { AddToPlaylistModal } from "@/components/music/AddToPlaylistModal";
 import { SearchBar } from "@/components/music/SearchBar";
 import { SongItem } from "@/components/music/SongItem";
+import { SongArtwork } from "@/components/music/SongArtwork";
+import { Chip } from "@/components/ui/Chip";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { GlassIconButton } from "@/components/ui/GlassIconButton";
+import { PressableScale } from "@/components/ui/PressableScale";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -15,9 +21,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type ViewMode = "songs" | "albums" | "artists";
@@ -114,8 +120,7 @@ export default function LibraryScreen() {
   );
 
   const filteredAlbums = useMemo(
-    () =>
-      q ? albums.filter((a) => a.name.toLowerCase().includes(q)) : albums,
+    () => (q ? albums.filter((a) => a.name.toLowerCase().includes(q)) : albums),
     [albums, q],
   );
   const filteredArtists = useMemo(
@@ -177,49 +182,85 @@ export default function LibraryScreen() {
     }
   };
 
-  const renderSongItem = ({ item }: { item: Song }) => (
-    <SongItem
-      song={item}
-      isActive={currentSong?.id === item.id}
-      onPress={() =>
-        playSong(item, selectedGroup ? selectedGroupSongs : filteredSongs)
-      }
-      onLongPress={() => setAddToPlaylistSongId(item.id)}
-      showFavorite
-      isFavorite={isFavorite(item.id)}
-      onToggleFavorite={() => toggleFavorite(item.id)}
-    />
+  // Only the first screenful animates in; deeper rows render instantly.
+  const enterFor = (index: number) =>
+    index < 12 ? FadeInDown.delay(index * 30).duration(280) : undefined;
+
+  const renderSongItem = ({ item, index }: { item: Song; index: number }) => (
+    <Animated.View entering={enterFor(index)}>
+      <SongItem
+        song={item}
+        isActive={currentSong?.id === item.id}
+        onPress={() =>
+          playSong(item, selectedGroup ? selectedGroupSongs : filteredSongs)
+        }
+        onLongPress={() => setAddToPlaylistSongId(item.id)}
+        showFavorite
+        isFavorite={isFavorite(item.id)}
+        onToggleFavorite={() => toggleFavorite(item.id)}
+      />
+    </Animated.View>
   );
 
-  const renderGroupItem = ({ item }: { item: GroupEntry }) => (
-    <TouchableOpacity
-      style={[styles.groupRow, { borderBottomColor: colors.border }]}
-      onPress={() => setSelectedGroup(item.name)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.groupIcon, { backgroundColor: colors.card }]}>
-        <Ionicons
-          name={viewMode === "albums" ? "disc-outline" : "person-outline"}
-          size={20}
-          color={colors.accent}
-        />
-      </View>
-      <View style={styles.groupInfo}>
-        <Text
-          style={[styles.groupName, { color: colors.text }]}
-          numberOfLines={1}
+  const renderGroupItem = ({
+    item,
+    index,
+  }: {
+    item: GroupEntry;
+    index: number;
+  }) => {
+    const cover = item.items.find((s) => s.artwork);
+    return (
+      <Animated.View entering={enterFor(index)}>
+        <PressableScale
+          style={[
+            styles.groupRow,
+            { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+          ]}
+          onPress={() => setSelectedGroup(item.name)}
         >
-          {item.name}
-        </Text>
-        <Text style={[styles.groupCount, { color: colors.textSecondary }]}>
-          {item.items.length} canciones
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-    </TouchableOpacity>
-  );
+          {cover ? (
+            <SongArtwork
+              song={cover}
+              size={48}
+              borderRadius={viewMode === "artists" ? 24 : BorderRadius.md}
+            />
+          ) : (
+            <View
+              style={[
+                styles.groupIcon,
+                { backgroundColor: colors.card },
+                viewMode === "artists" && { borderRadius: 24 },
+              ]}
+            >
+              <Ionicons
+                name={viewMode === "albums" ? "disc-outline" : "person-outline"}
+                size={22}
+                color={colors.tabIconSelected}
+              />
+            </View>
+          )}
+          <View style={styles.groupInfo}>
+            <Text
+              style={[styles.groupName, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {item.name}
+            </Text>
+            <Text style={[styles.groupCount, { color: colors.textSecondary }]}>
+              {item.items.length} canciones
+            </Text>
+          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={colors.textSecondary}
+          />
+        </PressableScale>
+      </Animated.View>
+    );
+  };
 
-  
   const header = (
     <View>
       {/* Header */}
@@ -234,31 +275,28 @@ export default function LibraryScreen() {
           </Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity
+          <GlassIconButton
+            icon="bar-chart"
+            size={38}
             onPress={() => router.push("/stats")}
-            style={styles.iconBtn}
             accessibilityLabel="Estadísticas"
+          />
+          <GlassIconButton
+            icon="folder-open-outline"
+            size={38}
+            onPress={pickMusicFiles}
+            accessibilityLabel="Importar archivos"
+          />
+          <GlassIconButton
+            icon="refresh-outline"
+            size={38}
+            onPress={loadDeviceMusic}
+            accessibilityLabel="Escanear música"
           >
-            <Ionicons name="bar-chart" size={20} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={pickMusicFiles} style={styles.iconBtn}>
-            <Ionicons
-              name="folder-open-outline"
-              size={22}
-              color={colors.accent}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={loadDeviceMusic} style={styles.iconBtn}>
             {isLoadingLibrary ? (
-              <ActivityIndicator size="small" color={colors.accent} />
-            ) : (
-              <Ionicons
-                name="refresh-outline"
-                size={22}
-                color={colors.accent}
-              />
-            )}
-          </TouchableOpacity>
+              <ActivityIndicator size="small" color={colors.tabIconSelected} />
+            ) : undefined}
+          </GlassIconButton>
         </View>
       </View>
 
@@ -266,58 +304,38 @@ export default function LibraryScreen() {
       <SearchBar value={search} onChangeText={setSearch} />
 
       {/* View mode segmented control */}
-      <View style={styles.segmentRow}>
-        {(
+      <SegmentedControl
+        style={styles.segment}
+        value={viewMode}
+        onChange={handleSwitchMode}
+        options={
           [
             { key: "songs", label: "Canciones" },
             { key: "albums", label: "Álbumes" },
             { key: "artists", label: "Artistas" },
           ] as const
-        ).map((mode) => (
-          <TouchableOpacity
-            key={mode.key}
-            onPress={() => handleSwitchMode(mode.key)}
-            style={[
-              styles.segmentBtn,
-              {
-                backgroundColor:
-                  viewMode === mode.key ? colors.accent : colors.card,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                {
-                  color:
-                    viewMode === mode.key ? "#FFFFFF" : colors.textSecondary,
-                },
-              ]}
-            >
-              {mode.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+        }
+      />
 
       {/* Group detail header */}
       {selectedGroup ? (
-        <TouchableOpacity
-          style={styles.groupBack}
-          onPress={() => {
-            setSelectedGroup(null);
-            setSearch("");
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={20} color={colors.text} />
+        <Animated.View entering={FadeIn} style={styles.groupBack}>
+          <GlassIconButton
+            icon="arrow-back"
+            size={36}
+            onPress={() => {
+              setSelectedGroup(null);
+              setSearch("");
+            }}
+            accessibilityLabel="Volver"
+          />
           <Text
             style={[styles.groupBackText, { color: colors.text }]}
             numberOfLines={1}
           >
             {selectedGroup}
           </Text>
-        </TouchableOpacity>
+        </Animated.View>
       ) : (
         <>
           {/* Genre chips */}
@@ -328,51 +346,20 @@ export default function LibraryScreen() {
               style={styles.genreScroll}
               contentContainerStyle={styles.genreContent}
             >
-              <TouchableOpacity
-                style={[
-                  styles.genreChip,
-                  {
-                    backgroundColor: !selectedGenre
-                      ? colors.accent
-                      : colors.card,
-                  },
-                ]}
+              <Chip
+                label="Todos"
+                selected={!selectedGenre}
                 onPress={() => setSelectedGenre(null)}
-              >
-                <Text
-                  style={[
-                    styles.genreText,
-                    { color: !selectedGenre ? "#FFF" : colors.text },
-                  ]}
-                >
-                  Todos
-                </Text>
-              </TouchableOpacity>
+              />
               {genres.map((genre) => (
-                <TouchableOpacity
+                <Chip
                   key={genre}
-                  style={[
-                    styles.genreChip,
-                    {
-                      backgroundColor:
-                        selectedGenre === genre ? colors.accent : colors.card,
-                    },
-                  ]}
+                  label={genre}
+                  selected={selectedGenre === genre}
                   onPress={() =>
                     setSelectedGenre(selectedGenre === genre ? null : genre)
                   }
-                >
-                  <Text
-                    style={[
-                      styles.genreText,
-                      {
-                        color: selectedGenre === genre ? "#FFF" : colors.text,
-                      },
-                    ]}
-                  >
-                    {genre}
-                  </Text>
-                </TouchableOpacity>
+                />
               ))}
             </ScrollView>
           )}
@@ -384,25 +371,16 @@ export default function LibraryScreen() {
                 {filteredSongs.length} canciones
               </Text>
               <View style={styles.sortActions}>
-                <TouchableOpacity
+                <Chip
+                  label="Aleatorio"
+                  icon="shuffle"
                   onPress={handleShuffleAll}
-                  style={styles.shuffleAllBtn}
-                >
-                  <Ionicons name="shuffle" size={16} color={colors.accent} />
-                  <Text style={[styles.sortLabel, { color: colors.accent }]}>
-                    Aleatorio
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={cycleSortBy} style={styles.sortBtn}>
-                  <Ionicons
-                    name="swap-vertical"
-                    size={16}
-                    color={colors.accent}
-                  />
-                  <Text style={[styles.sortLabel, { color: colors.accent }]}>
-                    {getSortLabel()}
-                  </Text>
-                </TouchableOpacity>
+                />
+                <Chip
+                  label={getSortLabel()}
+                  icon="swap-vertical"
+                  onPress={cycleSortBy}
+                />
               </View>
             </View>
           )}
@@ -411,13 +389,31 @@ export default function LibraryScreen() {
     </View>
   );
 
-  const listContentStyle = [
-    styles.listContent,
-    { paddingBottom: insets.bottom - 45 },
-  ];
+  const listContentStyle = styles.listContent;
+
+  const emptyLibrary = (
+    <EmptyState
+      icon={q ? "search-outline" : "musical-notes-outline"}
+      title={q ? "Sin resultados" : "Tu biblioteca está vacía"}
+      subtitle={
+        q
+          ? `No hay nada que coincida con "${search.trim()}".`
+          : "Escanea tu dispositivo o importa archivos de audio."
+      }
+    >
+      {!q && (
+        <Chip
+          label="Escanear música"
+          icon="refresh"
+          selected
+          onPress={loadDeviceMusic}
+        />
+      )}
+    </EmptyState>
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
       {header}
       {selectedGroup ? (
         <FlatList
@@ -425,6 +421,7 @@ export default function LibraryScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderSongItem}
           contentContainerStyle={listContentStyle}
+          ListEmptyComponent={emptyLibrary}
           showsVerticalScrollIndicator={false}
         />
       ) : viewMode === "songs" ? (
@@ -433,6 +430,7 @@ export default function LibraryScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderSongItem}
           contentContainerStyle={listContentStyle}
+          ListEmptyComponent={emptyLibrary}
           showsVerticalScrollIndicator={false}
         />
       ) : viewMode === "albums" ? (
@@ -441,6 +439,7 @@ export default function LibraryScreen() {
           keyExtractor={(item) => item.name}
           renderItem={renderGroupItem}
           contentContainerStyle={listContentStyle}
+          ListEmptyComponent={emptyLibrary}
           showsVerticalScrollIndicator={false}
         />
       ) : (
@@ -449,6 +448,7 @@ export default function LibraryScreen() {
           keyExtractor={(item) => item.name}
           renderItem={renderGroupItem}
           contentContainerStyle={listContentStyle}
+          ListEmptyComponent={emptyLibrary}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -474,23 +474,14 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.md,
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
-  logo: { width: 32, height: 32, borderRadius: 8 },
-  headerTitle: { fontSize: 24, fontWeight: "800" },
+  logo: { width: 34, height: 34, borderRadius: 10 },
+  headerTitle: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
   headerActions: { flexDirection: "row", gap: Spacing.sm },
   iconBtn: { padding: Spacing.sm },
-  segmentRow: {
-    flexDirection: "row",
-    gap: Spacing.xs,
+  segment: {
     marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
-  segmentBtn: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-  },
-  segmentText: { fontSize: 14, fontWeight: "600" },
   groupBack: {
     flexDirection: "row",
     alignItems: "center",
@@ -500,14 +491,7 @@ const styles = StyleSheet.create({
   },
   groupBackText: { fontSize: 17, fontWeight: "700", flexShrink: 1 },
   genreScroll: { maxHeight: 44, marginBottom: Spacing.xs },
-  genreContent: { paddingHorizontal: Spacing.lg, gap: Spacing.xs },
-  genreChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
-    justifyContent: "center",
-  },
-  genreText: { fontSize: 13, fontWeight: "600" },
+  genreContent: { paddingHorizontal: Spacing.lg, gap: Spacing.sm },
   sortBar: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -516,31 +500,21 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
   },
   songCount: { fontSize: 13 },
-  sortActions: { flexDirection: "row", gap: Spacing.md },
-  shuffleAllBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    padding: Spacing.xs,
-  },
-  sortBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    padding: Spacing.xs,
-  },
-  sortLabel: { fontSize: 13, fontWeight: "600" },
+  sortActions: { flexDirection: "row", gap: Spacing.sm },
   groupRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    padding: Spacing.sm,
+    paddingRight: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
     gap: Spacing.md,
   },
   groupIcon: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     borderRadius: BorderRadius.md,
     alignItems: "center",
     justifyContent: "center",
@@ -548,5 +522,5 @@ const styles = StyleSheet.create({
   groupInfo: { flex: 1 },
   groupName: { fontSize: 15, fontWeight: "600" },
   groupCount: { fontSize: 13, marginTop: 2 },
-  listContent: { paddingBottom: 120 },
+  listContent: { paddingBottom: Spacing.lg, flexGrow: 1 },
 });

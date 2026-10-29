@@ -1,3 +1,4 @@
+import { NeonSlider } from "@/components/ui/NeonSlider";
 import { Colors, Spacing } from "@/constants/theme";
 import {
   useMusicPlayer,
@@ -5,8 +6,7 @@ import {
 } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { formatDuration } from "@/utils/musicScanner";
-import Slider from "@react-native-community/slider";
-import React, { useCallback } from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 export function ProgressBar() {
@@ -14,29 +14,28 @@ export function ProgressBar() {
   const colors = Colors[colorScheme];
   const { seekTo } = useMusicPlayer();
   const { position, duration } = usePlaybackStatus();
-
-  const onSlidingComplete = useCallback(
-    (value: number) => {
-      seekTo(value);
-    },
-    [seekTo],
-  );
+  // While dragging, show the time under the finger instead of the playhead.
+  const [scrub, setScrub] = useState<number | null>(null);
 
   return (
     <View style={styles.container}>
-      <Slider
-        style={styles.slider}
+      <NeonSlider
         value={position}
-        minimumValue={0}
-        maximumValue={duration > 0 ? duration : 1}
-        onSlidingComplete={onSlidingComplete}
-        minimumTrackTintColor={colors.accent}
-        maximumTrackTintColor={colors.border}
-        thumbTintColor={colors.accent}
+        maximumValue={duration}
+        onSlidingComplete={seekTo}
+        onScrub={setScrub}
       />
       <View style={styles.timeContainer}>
-        <Text style={[styles.time, { color: colors.textSecondary }]}>
-          {formatDuration(position)}
+        <Text
+          style={[
+            styles.time,
+            {
+              color:
+                scrub !== null ? colors.tabIconSelected : colors.textSecondary,
+            },
+          ]}
+        >
+          {formatDuration(scrub ?? position)}
         </Text>
         <Text style={[styles.time, { color: colors.textSecondary }]}>
           {formatDuration(duration)}
@@ -51,16 +50,14 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingHorizontal: Spacing.lg,
   },
-  slider: {
-    width: "100%",
-    height: 40,
-  },
   timeContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: -Spacing.sm,
+    marginTop: -2,
   },
   time: {
     fontSize: 12,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
   },
 });

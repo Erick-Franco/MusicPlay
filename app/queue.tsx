@@ -1,18 +1,27 @@
 import { SongArtwork } from "@/components/music/SongArtwork";
 import { SongItem } from "@/components/music/SongItem";
-import { Colors, Spacing } from "@/constants/theme";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { GlassIconButton } from "@/components/ui/GlassIconButton";
+import { PressableScale } from "@/components/ui/PressableScale";
+import { ScreenBackground } from "@/components/ui/ScreenBackground";
+import { BorderRadius, Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
   Alert,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import Animated, {
+  FadeInDown,
+  FadeOutLeft,
+  LinearTransition,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function QueueScreen() {
@@ -52,48 +61,42 @@ export default function QueueScreen() {
   };
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: colors.background, paddingTop: insets.top },
-      ]}
-    >
-      {/* Header */}
+    <ScreenBackground style={{ paddingTop: insets.top }}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-down" size={28} color={colors.text} />
-        </TouchableOpacity>
+        <GlassIconButton
+          icon="chevron-down"
+          onPress={() => router.back()}
+          accessibilityLabel="Cerrar"
+        />
         <Text style={[styles.title, { color: colors.text }]}>
           Cola de reproducción
         </Text>
         {upcoming.length > 0 ? (
-          <TouchableOpacity onPress={handleClearQueue} style={styles.clearBtn}>
-            <Text style={[styles.clearText, { color: colors.danger }]}>
-              Vaciar
-            </Text>
-          </TouchableOpacity>
+          <GlassIconButton
+            icon="trash-outline"
+            color={colors.danger}
+            onPress={handleClearQueue}
+            accessibilityLabel="Vaciar cola"
+          />
         ) : (
-          <View style={{ width: 360 }} />
+          <View style={styles.headerSpacer} />
         )}
       </View>
 
       {queue.length === 0 ? (
-        <View style={styles.empty}>
-          <Ionicons
-            name="list-outline"
-            size={64}
-            color={colors.textSecondary}
-          />
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            La cola está vacía
-          </Text>
-        </View>
+        <EmptyState
+          icon="list-outline"
+          title="La cola está vacía"
+          subtitle="Reproduce una canción o una playlist para llenarla."
+        />
       ) : (
         <ScrollView
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: insets.bottom + Spacing.xl },
+          ]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Now playing */}
           {currentSong && (
             <View style={styles.section}>
               <Text
@@ -104,47 +107,57 @@ export default function QueueScreen() {
               <SongItem
                 song={currentSong}
                 isActive
-                onPress={() => {}}
+                onPress={() => router.back()}
                 showFavorite={false}
               />
             </View>
           )}
 
-          {/* Up next */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text
-                style={[styles.sectionTitle, { color: colors.textSecondary }]}
+                style={[
+                  styles.sectionTitle,
+                  styles.sectionTitleInline,
+                  { color: colors.textSecondary },
+                ]}
               >
-                {isShuffleOn
-                  ? `Modo aleatorio (${upcoming.length} canciones)`
-                  : `Siguiente (${upcoming.length} canciones)`}
+                {isShuffleOn ? "Aleatorio" : "Siguiente"} · {upcoming.length}
               </Text>
               {isShuffleOn && (
-                <Ionicons name="shuffle" size={16} color={colors.accent} />
+                <Ionicons
+                  name="shuffle"
+                  size={14}
+                  color={colors.tabIconSelected}
+                />
               )}
             </View>
             {upcoming.length === 0 ? (
               <Text
-                style={[
-                  styles.emptyUpcoming,
-                  { color: colors.textSecondary },
-                ]}
+                style={[styles.emptyUpcoming, { color: colors.textSecondary }]}
               >
                 No hay más canciones en la cola
               </Text>
             ) : (
-              upcoming.map(({ song, index }) => (
-                <View
+              upcoming.map(({ song, index }, i) => (
+                <Animated.View
                   key={`${song.id}-${index}`}
-                  style={[styles.row, { borderBottomColor: colors.border }]}
+                  entering={
+                    i < 12 ? FadeInDown.delay(i * 30).duration(260) : undefined
+                  }
+                  exiting={FadeOutLeft.duration(200)}
+                  layout={LinearTransition.springify().damping(18)}
                 >
-                  <TouchableOpacity
-                    style={styles.rowMain}
+                  <PressableScale
+                    style={styles.row}
+                    pressedScale={0.98}
                     onPress={() => playSong(song, queue)}
-                    activeOpacity={0.7}
                   >
-                    <SongArtwork song={song} size={40} />
+                    <SongArtwork
+                      song={song}
+                      size={44}
+                      borderRadius={BorderRadius.md}
+                    />
                     <View style={styles.rowInfo}>
                       <Text
                         style={[styles.rowTitle, { color: colors.text }]}
@@ -159,31 +172,30 @@ export default function QueueScreen() {
                         {song.artist}
                       </Text>
                     </View>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => removeFromQueue(index)}
-                    style={styles.removeBtn}
-                    hitSlop={10}
-                    accessibilityLabel="Quitar de la cola"
-                  >
-                    <Ionicons
-                      name="close"
-                      size={20}
-                      color={colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-                </View>
+                    <Pressable
+                      onPress={() => removeFromQueue(index)}
+                      style={styles.removeBtn}
+                      hitSlop={10}
+                      accessibilityLabel="Quitar de la cola"
+                    >
+                      <Ionicons
+                        name="close"
+                        size={18}
+                        color={colors.textSecondary}
+                      />
+                    </Pressable>
+                  </PressableScale>
+                </Animated.View>
               ))
             )}
           </View>
         </ScrollView>
       )}
-    </View>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -191,24 +203,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
   },
-  backBtn: { padding: Spacing.sm },
+  headerSpacer: { width: 40 },
   title: { fontSize: 17, fontWeight: "700" },
-  clearBtn: { padding: Spacing.sm },
-  clearText: { fontSize: 14, fontWeight: "600" },
-  empty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.md,
-    paddingBottom: 100,
-  },
-  emptyText: { fontSize: 16 },
   emptyUpcoming: {
     fontSize: 13,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
   },
-  listContent: { paddingBottom: 100 },
+  listContent: {},
   section: { marginTop: Spacing.md },
   sectionHeader: {
     flexDirection: "row",
@@ -218,22 +220,23 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "700",
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
   },
+  sectionTitleInline: { paddingHorizontal: 0, paddingVertical: 0 },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: Spacing.lg,
-    paddingRight: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.md,
   },
-  rowMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: Spacing.md, paddingRight: Spacing.md },
   rowInfo: { flex: 1 },
   rowTitle: { fontSize: 15, fontWeight: "600" },
   rowSub: { fontSize: 13, marginTop: 2 },

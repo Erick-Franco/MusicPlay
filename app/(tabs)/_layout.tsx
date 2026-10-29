@@ -1,33 +1,17 @@
 import { Tabs } from "expo-router";
-import { View } from "react-native";
 
-import { HapticTab } from "@/components/haptic-tab";
-import { MiniPlayer } from "@/components/music/MiniPlayer";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { GlassTabBar } from "@/components/ui/GlassTabBar";
+import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme() ?? "dark";
-  const colors = Colors[colorScheme];
-
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <ScreenBackground>
       <Tabs
+        tabBar={(props) => <GlassTabBar {...props} />}
         screenOptions={{
-          tabBarActiveTintColor: colors.tabIconSelected,
-          tabBarInactiveTintColor: colors.tabIconDefault,
-          tabBarStyle: {
-            backgroundColor: colors.surface,
-            borderTopColor: colors.border,
-            borderTopWidth: 1,
-            height: 56,
-            paddingTop: 2,
-            paddingBottom: 6,
-            
-          },
           headerShown: false,
-          tabBarButton: HapticTab,
+          sceneStyle: { backgroundColor: "transparent" },
         }}
       >
         <Tabs.Screen
@@ -67,7 +51,6 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-      <MiniPlayer />
-    </View>
+    </ScreenBackground>
   );
 }

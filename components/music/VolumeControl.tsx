@@ -1,10 +1,10 @@
+import { NeonSlider } from "@/components/ui/NeonSlider";
 import { Colors, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
-import Slider from "@react-native-community/slider";
-import React, { useCallback } from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import React from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 
 export function VolumeControl() {
   const colorScheme = useColorScheme() ?? "dark";
@@ -14,36 +14,25 @@ export function VolumeControl() {
   const getVolumeIcon = (): keyof typeof Ionicons.glyphMap => {
     if (isMuted || volume === 0) return "volume-mute";
     if (volume < 0.5) return "volume-low";
-    return "volume-high";
+    return "volume-medium";
   };
-
-  const onValueChange = useCallback(
-    (val: number) => {
-      setVolume(val);
-    },
-    [setVolume],
-  );
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={toggleMute} style={styles.iconBtn}>
+      <Pressable onPress={toggleMute} hitSlop={8} style={styles.iconBtn}>
         <Ionicons
           name={getVolumeIcon()}
-          size={20}
+          size={18}
           color={colors.textSecondary}
         />
-      </TouchableOpacity>
-      <Slider
+      </Pressable>
+      <NeonSlider
         style={styles.slider}
         value={isMuted ? 0 : volume}
-        minimumValue={0}
         maximumValue={1}
-        onSlidingComplete={onValueChange}
-        minimumTrackTintColor={colors.accent}
-        maximumTrackTintColor={colors.border}
-        thumbTintColor={colors.accent}
+        onSlidingComplete={setVolume}
       />
-      <Ionicons name="volume-high" size={20} color={colors.textSecondary} />
+      <Ionicons name="volume-high" size={18} color={colors.textSecondary} />
     </View>
   );
 }
@@ -52,7 +41,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.xl,
+    paddingHorizontal: Spacing.sm,
     gap: Spacing.sm,
   },
   iconBtn: {
@@ -60,6 +49,5 @@ const styles = StyleSheet.create({
   },
   slider: {
     flex: 1,
-    height: 40,
   },
 });

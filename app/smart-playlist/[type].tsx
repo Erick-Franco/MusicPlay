@@ -1,26 +1,26 @@
 import { MiniPlayer } from "@/components/music/MiniPlayer";
 import { SongItem } from "@/components/music/SongItem";
-import { BorderRadius, Colors, Spacing } from "@/constants/theme";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { GlassIconButton } from "@/components/ui/GlassIconButton";
+import { PlayShuffleButtons } from "@/components/ui/PlayShuffleButtons";
+import { ScreenBackground } from "@/components/ui/ScreenBackground";
+import { BorderRadius, Colors, Spacing, neonShadow } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Song } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo } from "react";
-import {
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const SMART_PLAYLIST_META: Record<string, { icon: string; color: string }> = {
-  recent: { icon: "time-outline", color: "#4ECDC4" },
-  most_played: { icon: "trending-up-outline", color: "#FF6B6B" },
-  favorites: { icon: "heart-outline", color: "#FF1744" },
-  recent_added: { icon: "add-circle-outline", color: "#7C4DFF" },
+  recent: { icon: "time-outline", color: "#06B6D4" },
+  most_played: { icon: "trending-up-outline", color: "#EC4899" },
+  favorites: { icon: "heart-outline", color: "#F472B6" },
+  recent_added: { icon: "add-circle-outline", color: "#8B5CF6" },
 };
 
 export default function SmartPlaylistScreen() {
@@ -95,149 +95,119 @@ export default function SmartPlaylistScreen() {
     playSong(smartSongs[randomIdx], smartSongs);
   };
 
-  return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: colors.background, paddingTop: insets.top },
-      ]}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <View style={styles.headerInfo}>
-          <View style={styles.headerTitleRow}>
-            <Ionicons name={meta.icon as any} size={22} color={meta.color} />
-            <Text
-              style={[styles.headerTitle, { color: colors.text }]}
-              numberOfLines={1}
-            >
-              {title}
-            </Text>
-          </View>
-          <Text style={[styles.headerCount, { color: colors.textSecondary }]}>
-            {smartSongs.length}{" "}
-            {smartSongs.length === 1 ? "canción" : "canciones"}
-          </Text>
-        </View>
-      </View>
-
-      {/* Playback controls */}
+  const listHeader = (
+    <Animated.View entering={FadeInDown.duration(400)} style={styles.hero}>
+      <LinearGradient
+        colors={[meta.color, meta.color + "55"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.heroIcon, neonShadow(meta.color)]}
+      >
+        <Ionicons name={meta.icon as any} size={64} color="#FFFFFF" />
+      </LinearGradient>
+      <Text
+        style={[styles.heroTitle, { color: colors.text }]}
+        numberOfLines={2}
+      >
+        {title}
+      </Text>
+      <Text style={[styles.heroCount, { color: colors.textSecondary }]}>
+        {smartSongs.length} {smartSongs.length === 1 ? "canción" : "canciones"}
+      </Text>
       {smartSongs.length > 0 && (
         <View style={styles.controlsRow}>
-          <TouchableOpacity
-            style={[styles.playAllBtn, { backgroundColor: meta.color }]}
-            onPress={handlePlayAll}
-          >
-            <Ionicons name="play" size={20} color="#FFFFFF" />
-            <Text style={styles.playAllText}>Reproducir</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.shuffleBtn,
-              { backgroundColor: colors.card, borderColor: meta.color },
-            ]}
-            onPress={handleShufflePlay}
-          >
-            <Ionicons name="shuffle" size={20} color={meta.color} />
-            <Text style={[styles.shuffleText, { color: meta.color }]}>
-              Aleatorio
-            </Text>
-          </TouchableOpacity>
+          <PlayShuffleButtons
+            onPlay={handlePlayAll}
+            onShuffle={handleShufflePlay}
+            gradient={[meta.color, meta.color + "AA"]}
+          />
         </View>
       )}
+    </Animated.View>
+  );
 
-      {/* Songs */}
+  return (
+    <ScreenBackground
+      style={{ paddingTop: insets.top }}
+      glowColor={meta.color + "40"}
+    >
+      <View style={styles.header}>
+        <GlassIconButton
+          icon="arrow-back"
+          onPress={() => router.back()}
+          accessibilityLabel="Volver"
+        />
+      </View>
+
       <FlatList
         data={smartSongs}
         keyExtractor={(item, idx) => `${item.id}_${idx}`}
-        renderItem={({ item }) => (
-          <SongItem
-            song={item}
-            isActive={currentSong?.id === item.id}
-            onPress={() => playSong(item, smartSongs)}
-            showFavorite
-          />
+        renderItem={({ item, index }) => (
+          <Animated.View
+            entering={
+              index < 12
+                ? FadeInDown.delay(index * 30).duration(280)
+                : undefined
+            }
+          >
+            <SongItem
+              song={item}
+              isActive={currentSong?.id === item.id}
+              onPress={() => playSong(item, smartSongs)}
+              showFavorite
+            />
+          </Animated.View>
         )}
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: insets.bottom + 100 }
-        ]}
+        ListHeaderComponent={listHeader}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons
-              name={meta.icon as any}
-              size={48}
-              color={colors.textSecondary}
-            />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              No hay canciones aún
-            </Text>
-          </View>
+          <EmptyState icon={meta.icon as any} title="No hay canciones aún" />
         }
       />
 
-      {/* MiniPlayer */}
-      <MiniPlayer />
-    </View>
+      {currentSong && (
+        <View
+          style={[
+            styles.miniPlayer,
+            { paddingBottom: Math.max(insets.bottom, Spacing.sm) },
+          ]}
+        >
+          <MiniPlayer />
+        </View>
+      )}
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-    gap: Spacing.md,
-  },
-  backBtn: { padding: Spacing.sm },
-  headerInfo: { flex: 1, gap: 2 },
-  headerTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  headerTitle: { fontSize: 22, fontWeight: "700" },
-  headerCount: { fontSize: 13 },
-  controlsRow: {
-    flexDirection: "row",
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    gap: Spacing.sm,
-  },
-  playAllBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    gap: Spacing.sm,
   },
-  playAllText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
-  shuffleBtn: {
-    flex: 1,
-    flexDirection: "row",
+  hero: {
+    alignItems: "center",
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.lg,
+  },
+  heroIcon: {
+    width: 150,
+    height: 150,
+    borderRadius: BorderRadius.xl,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    gap: Spacing.sm,
-    borderWidth: 1.5,
   },
-  shuffleText: { fontSize: 15, fontWeight: "600" },
-  empty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.md,
-    paddingTop: 100,
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+    textAlign: "center",
+    marginTop: Spacing.lg,
   },
-  emptyText: { fontSize: 15 },
-  listContent: { paddingBottom: 120 },
+  heroCount: { fontSize: 14, marginTop: 4 },
+  controlsRow: { marginTop: Spacing.lg },
+  listContent: { paddingBottom: Spacing.lg },
+  miniPlayer: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm },
 });

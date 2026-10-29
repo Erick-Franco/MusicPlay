@@ -1,17 +1,22 @@
-import { BorderRadius, Colors, Spacing } from "@/constants/theme";
+import { GlassSheet } from "@/components/ui/GlassSheet";
+import { PressableScale } from "@/components/ui/PressableScale";
+import { BorderRadius, Colors, NeonGradient, Spacing } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
   FlatList,
-  Modal,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
+
+import { PlaylistCover } from "./PlaylistCard";
+import { SongArtwork } from "./SongArtwork";
 
 interface AddToPlaylistModalProps {
   visible: boolean;
@@ -49,223 +54,245 @@ export function AddToPlaylistModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View style={[styles.container, { backgroundColor: colors.surface }]}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              Agregar a Playlist
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Create new playlist inline */}
-          {showCreate ? (
-            <View
-              style={[styles.createRow, { borderBottomColor: colors.border }]}
+    <GlassSheet visible={visible} onClose={onClose} title="Agregar a playlist">
+      {/* Song being added */}
+      {song && (
+        <View
+          style={[
+            styles.songCard,
+            { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+          ]}
+        >
+          <SongArtwork song={song} size={44} borderRadius={BorderRadius.md} />
+          <View style={{ flex: 1 }}>
+            <Text
+              style={[styles.songTitle, { color: colors.text }]}
+              numberOfLines={1}
             >
-              <TextInput
-                style={[
-                  styles.createInput,
-                  { color: colors.text, backgroundColor: colors.card },
-                ]}
-                value={newName}
-                onChangeText={setNewName}
-                placeholder="Nombre de la playlist"
-                placeholderTextColor={colors.textSecondary}
-                autoFocus
-              />
-              <TouchableOpacity
-                onPress={handleCreateAndAdd}
-                disabled={!newName.trim()}
-              >
-                <Ionicons
-                  name="checkmark-circle"
-                  size={30}
-                  color={newName.trim() ? colors.accent : colors.textSecondary}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowCreate(false);
-                  setNewName("");
-                }}
-              >
-                <Ionicons
-                  name="close-circle"
-                  size={30}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <TouchableOpacity
-                style={[styles.createBtn, { borderBottomColor: colors.border }]}
-                onPress={() => setShowCreate(true)}
-              >
-                <View
-                  style={[styles.createIcon, { backgroundColor: colors.accent }]}
-                >
-                  <Ionicons name="add" size={18} color="#FFFFFF" />
-                </View>
-                <Text style={[styles.createText, { color: colors.accent }]}>
-                  Crear nueva playlist
-                </Text>
-              </TouchableOpacity>
+              {song.title}
+            </Text>
+            <Text
+              style={[styles.songArtist, { color: colors.textSecondary }]}
+              numberOfLines={1}
+            >
+              {song.artist}
+            </Text>
+          </View>
+        </View>
+      )}
 
-              {song && (
-                <TouchableOpacity
-                  style={[styles.createBtn, { borderBottomColor: colors.border }]}
-                  onPress={() => {
-                    playNext(song);
-                    onClose();
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.createIcon,
-                      { backgroundColor: colors.card, borderColor: colors.border },
-                    ]}
-                  >
-                    <Ionicons name="play" size={18} color={colors.accent} />
-                  </View>
-                  <Text style={[styles.createText, { color: colors.text }]}>
-                    Reproducir a continuación
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-
-          {playlists.length === 0 && !showCreate ? (
-            <View style={styles.empty}>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                Crea tu primera playlist arriba
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={playlists}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => {
-                const alreadyAdded = item.songIds.includes(songId);
-                return (
-                  <TouchableOpacity
-                    style={[styles.item, { borderBottomColor: colors.border }]}
-                    onPress={() => !alreadyAdded && handleSelect(item.id)}
-                    disabled={alreadyAdded}
-                  >
-                    <Ionicons
-                      name="musical-notes"
-                      size={22}
-                      color={
-                        alreadyAdded ? colors.textSecondary : colors.accent
-                      }
-                    />
-                    <Text
-                      style={[
-                        styles.itemText,
-                        {
-                          color: alreadyAdded
-                            ? colors.textSecondary
-                            : colors.text,
-                        },
-                      ]}
-                    >
-                      {item.name}
-                    </Text>
-                    {alreadyAdded && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={20}
-                        color={colors.accent}
-                      />
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
+      {showCreate ? (
+        <View style={styles.createRow}>
+          <TextInput
+            style={[
+              styles.createInput,
+              {
+                color: colors.text,
+                backgroundColor: colors.glass,
+                borderColor: colors.accent + "99",
+              },
+            ]}
+            value={newName}
+            onChangeText={setNewName}
+            placeholder="Nombre de la playlist"
+            placeholderTextColor={colors.textSecondary}
+            selectionColor={colors.accent}
+            onSubmitEditing={handleCreateAndAdd}
+            returnKeyType="done"
+            autoFocus
+          />
+          <Pressable
+            onPress={handleCreateAndAdd}
+            disabled={!newName.trim()}
+            hitSlop={6}
+          >
+            <Ionicons
+              name="checkmark-circle"
+              size={34}
+              color={
+                newName.trim() ? colors.tabIconSelected : colors.textSecondary
+              }
             />
+          </Pressable>
+          <Pressable
+            hitSlop={6}
+            onPress={() => {
+              setShowCreate(false);
+              setNewName("");
+            }}
+          >
+            <Ionicons
+              name="close-circle"
+              size={34}
+              color={colors.textSecondary}
+            />
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.actions}>
+          <PressableScale
+            haptic
+            style={[
+              styles.action,
+              {
+                backgroundColor: colors.glass,
+                borderColor: colors.glassBorder,
+              },
+            ]}
+            onPress={() => setShowCreate(true)}
+          >
+            <LinearGradient colors={NeonGradient} style={styles.actionIcon}>
+              <Ionicons name="add" size={20} color="#FFFFFF" />
+            </LinearGradient>
+            <Text style={[styles.actionText, { color: colors.text }]}>
+              Nueva playlist
+            </Text>
+          </PressableScale>
+          {song && (
+            <PressableScale
+              haptic
+              style={[
+                styles.action,
+                {
+                  backgroundColor: colors.glass,
+                  borderColor: colors.glassBorder,
+                },
+              ]}
+              onPress={() => {
+                playNext(song);
+                onClose();
+              }}
+            >
+              <View
+                style={[styles.actionIcon, { backgroundColor: colors.card }]}
+              >
+                <Ionicons
+                  name="play-forward"
+                  size={18}
+                  color={colors.tabIconSelected}
+                />
+              </View>
+              <Text style={[styles.actionText, { color: colors.text }]}>
+                Reproducir después
+              </Text>
+            </PressableScale>
           )}
         </View>
-      </TouchableOpacity>
-    </Modal>
+      )}
+
+      {playlists.length === 0 && !showCreate ? (
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          Aún no tienes playlists. Crea la primera arriba.
+        </Text>
+      ) : (
+        <FlatList
+          data={playlists}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => {
+            const alreadyAdded = item.songIds.includes(songId);
+            return (
+              <PressableScale
+                pressedScale={0.98}
+                style={[styles.item, alreadyAdded && styles.itemDisabled]}
+                onPress={() => !alreadyAdded && handleSelect(item.id)}
+                disabled={alreadyAdded}
+              >
+                <PlaylistCover songIds={item.songIds} size={44} />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[styles.itemText, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </Text>
+                  <Text
+                    style={[styles.itemSub, { color: colors.textSecondary }]}
+                  >
+                    {alreadyAdded
+                      ? "Ya está en esta playlist"
+                      : `${item.songIds.length} canciones`}
+                  </Text>
+                </View>
+                <Ionicons
+                  name={
+                    alreadyAdded ? "checkmark-circle" : "add-circle-outline"
+                  }
+                  size={24}
+                  color={
+                    alreadyAdded ? colors.tabIconSelected : colors.textSecondary
+                  }
+                />
+              </PressableScale>
+            );
+          }}
+        />
+      )}
+    </GlassSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
-  },
-  container: {
-    maxHeight: "65%",
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    paddingBottom: Spacing.xxl,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.lg,
-  },
-  title: { fontSize: 18, fontWeight: "700" },
-  createBtn: {
+  songCard: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
     gap: Spacing.md,
   },
-  createIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  songTitle: { fontSize: 15, fontWeight: "700" },
+  songArtist: { fontSize: 13, marginTop: 2 },
+  actions: {
+    flexDirection: "row",
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  action: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  actionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "transparent",
   },
-  createText: { fontSize: 15, fontWeight: "600" },
+  actionText: { fontSize: 14, fontWeight: "700", flexShrink: 1 },
   createRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
     gap: Spacing.sm,
   },
   createInput: {
     flex: 1,
-    height: 40,
-    borderRadius: BorderRadius.sm,
+    height: 46,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
     paddingHorizontal: Spacing.md,
     fontSize: 15,
   },
-  empty: { alignItems: "center", padding: Spacing.xxl },
-  emptyText: { fontSize: 15 },
+  emptyText: { fontSize: 14, textAlign: "center", padding: Spacing.xl },
+  list: { paddingHorizontal: Spacing.sm, paddingTop: Spacing.xs },
   item: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.lg,
     gap: Spacing.md,
   },
-  itemText: { flex: 1, fontSize: 15, fontWeight: "500" },
+  itemDisabled: { opacity: 0.6 },
+  itemText: { fontSize: 15, fontWeight: "600" },
+  itemSub: { fontSize: 12, marginTop: 2 },
 });

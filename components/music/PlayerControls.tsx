@@ -1,10 +1,13 @@
-import { Colors, Spacing } from "@/constants/theme";
+import { PressableScale } from "@/components/ui/PressableScale";
+import { Colors, NeonGradient, Spacing, neonShadow } from "@/constants/theme";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { RepeatMode } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
 
 interface PlayerControlsProps {
   size?: "small" | "large";
@@ -25,76 +28,106 @@ export function PlayerControls({ size = "large" }: PlayerControlsProps) {
   } = useMusicPlayer();
 
   const isLarge = size === "large";
-  const mainIconSize = isLarge ? 38 : 28;
-  const sideIconSize = isLarge ? 28 : 22;
+  const mainIconSize = isLarge ? 34 : 26;
+  const sideIconSize = isLarge ? 30 : 22;
   const modeIconSize = isLarge ? 22 : 18;
+  const playSize = isLarge ? 76 : 56;
+  const repeatOn = repeatMode !== RepeatMode.OFF;
+
+  // Toggles get a glowing dot underneath when on.
+  const modeDot = (on: boolean) => (
+    <View
+      style={[
+        styles.modeDot,
+        { backgroundColor: on ? colors.tabIconSelected : "transparent" },
+      ]}
+    />
+  );
 
   return (
     <View style={[styles.container, isLarge && styles.containerLarge]}>
-      {/* Shuffle */}
-      <TouchableOpacity onPress={toggleShuffle} style={styles.modeBtn}>
+      <PressableScale onPress={toggleShuffle} haptic style={styles.modeBtn}>
         <Ionicons
           name="shuffle"
           size={modeIconSize}
-          color={isShuffleOn ? colors.accent : colors.textSecondary}
+          color={isShuffleOn ? colors.tabIconSelected : colors.textSecondary}
         />
-      </TouchableOpacity>
+        {modeDot(isShuffleOn)}
+      </PressableScale>
 
-      {/* Previous */}
-      <TouchableOpacity onPress={previous} style={styles.controlBtn}>
+      <PressableScale
+        onPress={previous}
+        haptic
+        pressedScale={0.85}
+        style={styles.controlBtn}
+      >
         <Ionicons
           name="play-skip-back"
           size={sideIconSize}
           color={colors.text}
         />
-      </TouchableOpacity>
+      </PressableScale>
 
-      {/* Play/Pause */}
-      <TouchableOpacity
+      <PressableScale
         onPress={togglePlayPause}
-        style={[styles.playBtn, { backgroundColor: colors.accent }]}
+        haptic
+        pressedScale={0.9}
+        style={[styles.playBtn, neonShadow(NeonGradient[1])]}
+        accessibilityLabel={isPlaying ? "Pausar" : "Reproducir"}
       >
-        <Ionicons
-          name={isPlaying ? "pause" : "play"}
-          size={mainIconSize}
-          color="#FFFFFF"
-          style={!isPlaying ? { marginLeft: 3 } : undefined}
-        />
-      </TouchableOpacity>
+        <LinearGradient
+          colors={NeonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.playFill,
+            { width: playSize, height: playSize, borderRadius: playSize / 2 },
+          ]}
+        >
+          {/* Keyed so the icon zooms between play and pause */}
+          <Animated.View
+            key={isPlaying ? "pause" : "play"}
+            entering={ZoomIn.springify().damping(14)}
+            exiting={ZoomOut.duration(120)}
+          >
+            <Ionicons
+              name={isPlaying ? "pause" : "play"}
+              size={mainIconSize}
+              color="#FFFFFF"
+              style={!isPlaying ? { marginLeft: 4 } : undefined}
+            />
+          </Animated.View>
+        </LinearGradient>
+      </PressableScale>
 
-      {/* Next */}
-      <TouchableOpacity onPress={next} style={styles.controlBtn}>
+      <PressableScale
+        onPress={next}
+        haptic
+        pressedScale={0.85}
+        style={styles.controlBtn}
+      >
         <Ionicons
           name="play-skip-forward"
           size={sideIconSize}
           color={colors.text}
         />
-      </TouchableOpacity>
+      </PressableScale>
 
-      {/* Repeat */}
-      <TouchableOpacity onPress={cycleRepeatMode} style={styles.modeBtn}>
+      <PressableScale onPress={cycleRepeatMode} haptic style={styles.modeBtn}>
         <View>
           <Ionicons
             name="repeat"
             size={modeIconSize}
-            color={
-              repeatMode !== RepeatMode.OFF
-                ? colors.accent
-                : colors.textSecondary
-            }
+            color={repeatOn ? colors.tabIconSelected : colors.textSecondary}
           />
           {repeatMode === RepeatMode.ONE && (
-            <View
-              style={[
-                styles.repeatOneBadge,
-                { backgroundColor: colors.accent },
-              ]}
-            >
+            <LinearGradient colors={NeonGradient} style={styles.repeatOneBadge}>
               <Text style={styles.repeatOneText}>1</Text>
-            </View>
+            </LinearGradient>
           )}
         </View>
-      </TouchableOpacity>
+        {modeDot(repeatOn)}
+      </PressableScale>
     </View>
   );
 }
@@ -112,21 +145,23 @@ const styles = StyleSheet.create({
   },
   modeBtn: {
     padding: Spacing.sm,
+    alignItems: "center",
+  },
+  modeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 4,
   },
   controlBtn: {
     padding: Spacing.sm,
   },
   playBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    borderRadius: 999,
+  },
+  playFill: {
     alignItems: "center",
     justifyContent: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
   },
   repeatOneBadge: {
     position: "absolute",
