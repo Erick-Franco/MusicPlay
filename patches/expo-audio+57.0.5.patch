@@ -1,17 +1,32 @@
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioRecords.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioRecords.kt
+index 86880d9..7681ed3 100644
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioRecords.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioRecords.kt
+@@ -55,7 +55,8 @@ class Metadata(
+   @Field val title: String?,
+   @Field val artist: String?,
+   @Field val albumTitle: String?,
+-  @Field val artworkUrl: URL?
++  @Field val artworkUrl: URL?,
++  @Field val isFavorite: Boolean? = null
+ ) : Record
+ 
+ enum class AndroidOutputFormat(val value: String) : Enumerable {
 diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
-index 196a5d5..ee58cb7 100644
+index 196a5d5..eb44d92 100644
 --- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
 +++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioControlsService.kt
-@@ -90,6 +90,8 @@ class AudioControlsService : MediaSessionService() {
+@@ -90,6 +90,9 @@ class AudioControlsService : MediaSessionService() {
  
          ACTION_SEEK_FORWARD -> currentPlayerRef.seekTo(currentPlayerRef.currentPosition + SEEK_INTERVAL_MS)
          ACTION_SEEK_BACKWARD -> currentPlayerRef.seekTo(currentPlayerRef.currentPosition - SEEK_INTERVAL_MS)
 +        ACTION_PREVIOUS -> dispatchTrackCommand("previous")
 +        ACTION_NEXT -> dispatchTrackCommand("next")
++        ACTION_FAVORITE -> dispatchTrackCommand("favorite")
        }
      }
  
-@@ -97,6 +99,12 @@ class AudioControlsService : MediaSessionService() {
+@@ -97,6 +100,12 @@ class AudioControlsService : MediaSessionService() {
      return super.onStartCommand(intent, flags, startId)
    }
  
@@ -24,7 +39,7 @@ index 196a5d5..ee58cb7 100644
    private fun ensureForegroundNotification() {
      val notification = buildNotification() ?: buildPlaceholderNotification()
      try {
-@@ -192,6 +200,17 @@ class AudioControlsService : MediaSessionService() {
+@@ -192,6 +201,17 @@ class AudioControlsService : MediaSessionService() {
        val compactViewIndices = mutableListOf<Int>()
        var currentIndex = 0
  
@@ -42,7 +57,7 @@ index 196a5d5..ee58cb7 100644
        if (currentOptions?.showSeekBackward == true) {
          builder.addAction(
            NotificationCompat.Action(
-@@ -200,7 +219,6 @@ class AudioControlsService : MediaSessionService() {
+@@ -200,7 +220,6 @@ class AudioControlsService : MediaSessionService() {
              buildActionPendingIntent(ACTION_SEEK_BACKWARD)
            )
          )
@@ -50,7 +65,7 @@ index 196a5d5..ee58cb7 100644
          currentIndex++
        }
  
-@@ -226,9 +244,19 @@ class AudioControlsService : MediaSessionService() {
+@@ -226,9 +245,33 @@ class AudioControlsService : MediaSessionService() {
              buildActionPendingIntent(ACTION_SEEK_FORWARD)
            )
          )
@@ -67,11 +82,25 @@ index 196a5d5..ee58cb7 100644
 +        )
 +      )
 +      compactViewIndices.add(currentIndex)
++      currentIndex++
++
++      // Favorite toggle (expanded view only)
++      builder.addAction(
++        NotificationCompat.Action(
++          if (currentMetadata?.isFavorite == true) {
++            androidx.media3.session.R.drawable.media3_icon_heart_filled
++          } else {
++            androidx.media3.session.R.drawable.media3_icon_heart_unfilled
++          },
++          "Favorite",
++          buildActionPendingIntent(ACTION_FAVORITE)
++        )
++      )
 +
        style.setShowActionsInCompactView(*compactViewIndices.toIntArray())
      }
  
-@@ -240,6 +268,17 @@ class AudioControlsService : MediaSessionService() {
+@@ -240,6 +283,17 @@ class AudioControlsService : MediaSessionService() {
      val session = mediaSession ?: return
      val mediaButtons = mutableListOf<CommandButton>()
  
@@ -89,7 +118,7 @@ index 196a5d5..ee58cb7 100644
      // Add seek backward button if enabled
      if (currentOptions?.showSeekBackward == true) {
        mediaButtons.add(
-@@ -274,6 +313,16 @@ class AudioControlsService : MediaSessionService() {
+@@ -274,6 +328,29 @@ class AudioControlsService : MediaSessionService() {
        )
      }
  
@@ -103,10 +132,23 @@ index 196a5d5..ee58cb7 100644
 +        .build()
 +    )
 +
++    // Favorite toggle; the icon reflects the state sent from JS in the metadata
++    val isFavorite = currentMetadata?.isFavorite == true
++    mediaButtons.add(
++      CommandButton.Builder(
++        if (isFavorite) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED
++      )
++        .setDisplayName(if (isFavorite) "Remove from favorites" else "Add to favorites")
++        .setEnabled(true)
++        .setSessionCommand(SessionCommand(ACTION_FAVORITE, Bundle.EMPTY))
++        .setSlots(CommandButton.SLOT_OVERFLOW)
++        .build()
++    )
++
      session.setCustomLayout(mediaButtons)
      session.setMediaButtonPreferences(mediaButtons)
    }
-@@ -371,7 +420,7 @@ class AudioControlsService : MediaSessionService() {
+@@ -371,7 +448,7 @@ class AudioControlsService : MediaSessionService() {
            updateMetadata(metadata)
          }
          val session = MediaSession.Builder(context, sessionPlayer)
@@ -115,7 +157,18 @@ index 196a5d5..ee58cb7 100644
            .build()
  
          // Replace the basic media session with a session connected to our playback service.
-@@ -452,7 +501,7 @@ class AudioControlsService : MediaSessionService() {
+@@ -402,6 +479,10 @@ class AudioControlsService : MediaSessionService() {
+     }
+     currentMetadata = metadata
+     sessionMetadataPlayer?.updateMetadata(metadata)
++    // Refresh the favorite button icon
++    appContext?.mainQueue?.launch {
++      updateSessionCustomLayout(player.ref.isPlaying)
++    }
+     currentMetadata?.artworkUrl?.let {
+       loadArtworkFromUrl(it) { bitmap ->
+         currentArtwork = bitmap
+@@ -452,7 +533,7 @@ class AudioControlsService : MediaSessionService() {
            updateMetadata(metadata)
          }
          val session = MediaSession.Builder(context, sessionPlayer)
@@ -124,7 +177,7 @@ index 196a5d5..ee58cb7 100644
            .build()
  
          player.mediaSession.release()
-@@ -535,6 +584,10 @@ class AudioControlsService : MediaSessionService() {
+@@ -535,6 +616,10 @@ class AudioControlsService : MediaSessionService() {
        }
  
        override fun onPlaybackStateChanged(playbackState: Int) {
@@ -135,17 +188,18 @@ index 196a5d5..ee58cb7 100644
          postOrStartForegroundNotification(startInForeground = false)
        }
      }
-@@ -558,6 +611,8 @@ class AudioControlsService : MediaSessionService() {
+@@ -558,6 +643,9 @@ class AudioControlsService : MediaSessionService() {
  
      const val ACTION_SEEK_FORWARD = "expo.modules.audio.action.SEEK_FORWARD"
      const val ACTION_SEEK_BACKWARD = "expo.modules.audio.action.SEEK_BACKWARD"
 +    const val ACTION_PREVIOUS = "expo.modules.audio.action.PREVIOUS"
 +    const val ACTION_NEXT = "expo.modules.audio.action.NEXT"
++    const val ACTION_FAVORITE = "expo.modules.audio.action.FAVORITE"
  
      const val SEEK_INTERVAL_MS = 10000L
    }
 diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
-index 839aaef..5425d90 100644
+index 839aaef..c52d4c7 100644
 --- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
 +++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/service/AudioMediaSessionCallback.kt
 @@ -10,7 +10,9 @@ import androidx.media3.common.util.UnstableApi
@@ -159,16 +213,17 @@ index 839aaef..5425d90 100644
    override fun onConnect(
      session: MediaSession,
      controller: MediaSession.ControllerInfo
-@@ -35,6 +37,8 @@ class AudioMediaSessionCallback : MediaSession.Callback {
+@@ -35,6 +37,9 @@ class AudioMediaSessionCallback : MediaSession.Callback {
            MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
              .add(SessionCommand(AudioControlsService.ACTION_SEEK_BACKWARD, Bundle.EMPTY))
              .add(SessionCommand(AudioControlsService.ACTION_SEEK_FORWARD, Bundle.EMPTY))
 +            .add(SessionCommand(AudioControlsService.ACTION_PREVIOUS, Bundle.EMPTY))
 +            .add(SessionCommand(AudioControlsService.ACTION_NEXT, Bundle.EMPTY))
++            .add(SessionCommand(AudioControlsService.ACTION_FAVORITE, Bundle.EMPTY))
              .build()
          )
          .build()
-@@ -56,6 +60,12 @@ class AudioMediaSessionCallback : MediaSession.Callback {
+@@ -56,6 +61,15 @@ class AudioMediaSessionCallback : MediaSession.Callback {
        AudioControlsService.ACTION_SEEK_BACKWARD -> {
          session.player.seekTo(session.player.currentPosition - AudioControlsService.SEEK_INTERVAL_MS)
        }
@@ -178,6 +233,35 @@ index 839aaef..5425d90 100644
 +      AudioControlsService.ACTION_NEXT -> {
 +        service.dispatchTrackCommand("next")
 +      }
++      AudioControlsService.ACTION_FAVORITE -> {
++        service.dispatchTrackCommand("favorite")
++      }
      }
      return super.onCustomCommand(session, controller, command, args)
    }
+diff --git a/node_modules/expo-audio/build/Audio.types.d.ts b/node_modules/expo-audio/build/Audio.types.d.ts
+index 2560478..381a53a 100644
+--- a/node_modules/expo-audio/build/Audio.types.d.ts
++++ b/node_modules/expo-audio/build/Audio.types.d.ts
+@@ -618,6 +618,8 @@ export type AudioMetadata = {
+     artist?: string;
+     albumTitle?: string;
+     artworkUrl?: string;
++    /** Android only (patched): state of the favorite button in the media notification. */
++    isFavorite?: boolean;
+ };
+ /**
+  * Loop mode for audio playlist playback.
+diff --git a/node_modules/expo-audio/src/Audio.types.ts b/node_modules/expo-audio/src/Audio.types.ts
+index 906753f..dfd4d9a 100644
+--- a/node_modules/expo-audio/src/Audio.types.ts
++++ b/node_modules/expo-audio/src/Audio.types.ts
+@@ -664,6 +664,8 @@ export type AudioMetadata = {
+   artist?: string;
+   albumTitle?: string;
+   artworkUrl?: string;
++  /** Android only (patched): state of the favorite button in the media notification. */
++  isFavorite?: boolean;
+ };
+ 
+ /**

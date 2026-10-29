@@ -32,10 +32,11 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
-import { PermissionsAndroid, Platform } from "react-native";
+import { Alert, PermissionsAndroid, Platform } from "react-native";
 
 export const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
@@ -205,6 +206,10 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
   const repeatModeRef = useRef(repeatMode);
   const isShuffleOnRef = useRef(isShuffleOn);
   const sleepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Wall-clock deadline (ms) of the sleep timer. JS intervals are throttled
+  // while the app is in the background, so the remaining time is always
+  // derived from this instead of counting ticks.
+  const sleepEndRef = useRef<number | null>(null);
   const statusRef = useRef<AudioStatus | null>(null);
   const volumeRef = useRef(volume);
   const isMutedRef = useRef(isMuted);
@@ -215,6 +220,8 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
   const undoHandlerRef = useRef<(() => void) | null>(null);
   const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lockScreenActiveRef = useRef(false);
+  const favoriteIdsRef = useRef(favoriteIds);
+  favoriteIdsRef.current = favoriteIds;
   queueRef.current = queue;
   queueIndexRef.current = queueIndex;
   repeatModeRef.current = repeatMode;
@@ -239,6 +246,53 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
     isPlayingRef.current = playing;
     setIsPlaying(playing);
   }, []);
+
+  // === Lock screen / notification ===
+  // Rebuilding the media session on every track change (via
+  // setActiveForLockScreen) makes the notification lose its buttons, so
+  // activate once and then only update the metadata for subsequent tracks.
+  const updateLockScreen = useCallback(
+    (song: Song) => {
+      const metadata = {
+        title: song.title,
+        artist: song.artist,
+        albumTitle: song.album || "MusicPlay",
+        // Local file:// URI of the extracted cover; the native service loads it.
+        artworkUrl: song.artwork ?? undefined,
+        isFavorite: favoriteIdsRef.current.has(song.id),
+      };
+      if (!lockScreenActiveRef.current) {
+        player.setActiveForLockScreen(true, metadata);
+        lockScreenActiveRef.current = true;
+      } else {
+        player.updateLockScreenMetadata(metadata);
+      }
+    },
+    [player],
+  );
+
+  // === Sleep timer ===
+  const clearSleepTimer = useCallback(() => {
+    if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
+    sleepTimerRef.current = null;
+    sleepEndRef.current = null;
+    setSleepTimerRemaining(null);
+  }, []);
+
+  // Recomputes the remaining time; pauses playback once the deadline passed.
+  const checkSleepTimer = useCallback(() => {
+    const end = sleepEndRef.current;
+    if (end === null) return;
+    const remaining = Math.ceil((end - Date.now()) / 1000);
+    if (remaining > 0) {
+      setSleepTimerRemaining(remaining);
+      return;
+    }
+    clearSleepTimer();
+    player.pause();
+    setPlayingState(false);
+    saveCurrentState();
+  }, [player, clearSleepTimer, setPlayingState, saveCurrentState]);
 
   // === Undo ===
   const runWithUndo = useCallback((message: string, handler: () => void) => {
@@ -364,6 +418,9 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
               lastSavedPositionRef.current = lastPosition;
               currentSongRef.current = restored;
               setCurrentSong(restored);
+              // Without this, resuming the restored song shows no
+              // notification controls until the next track change.
+              updateLockScreen(restored);
               setQueue([restored]);
               setQueueIndex(0);
               setPlayingState(false);
@@ -408,6 +465,7 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {
       console.warn("Failed to scan device music:", e);
+      Alert.alert("Error", "No se pudo escanear la música del dispositivo.");
     } finally {
       setIsLoadingLibrary(false);
     }
@@ -424,6 +482,7 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {
       console.warn("Failed to pick audio files:", e);
+      Alert.alert("Error", "No se pudieron importar los archivos seleccionados.");
     }
   }, []);
 
@@ -459,24 +518,7 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
 
         player.replace({ uri: song.audioUri });
 
-        // Setup lockscreen/notification controls. Rebuilding the media
-        // session on every track change (via setActiveForLockScreen) makes
-        // the notification lose its buttons, so activate once and then only
-        // update the metadata for subsequent tracks.
-        if (!lockScreenActiveRef.current) {
-          player.setActiveForLockScreen(true, {
-            title: song.title,
-            artist: song.artist,
-            albumTitle: song.album || "MusicPlay",
-          });
-          lockScreenActiveRef.current = true;
-        } else {
-          player.updateLockScreenMetadata({
-            title: song.title,
-            artist: song.artist,
-            albumTitle: song.album || "MusicPlay",
-          });
-        }
+        updateLockScreen(song);
         player.volume = isMutedRef.current ? 0 : volumeRef.current;
         player.setPlaybackRate(rateRef.current);
         player.play();
@@ -486,7 +528,7 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
         setPlayingState(false);
       }
     },
-    [player, addToRecents, saveCurrentState, setPlayingState],
+    [player, addToRecents, saveCurrentState, setPlayingState, updateLockScreen],
   );
 
   // Sync isPlaying with the real player state (covers OS interruptions:
@@ -494,12 +536,15 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
   const onStatusChange = useCallback(
     (next: AudioStatus) => {
       statusRef.current = next;
+      // Native status updates keep arriving in the background while playing,
+      // so they also drive the sleep timer when JS intervals are throttled.
+      checkSleepTimer();
       if (isPlayingRef.current !== next.playing) {
         isPlayingRef.current = next.playing;
         setIsPlaying(next.playing);
       }
     },
-    [],
+    [checkSleepTimer],
   );
 
   // Advance one step through the queue. With shuffle on, the queue is
@@ -651,6 +696,7 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
 
   // Forward Android lock-screen / notification track commands to the app.
   // Emitted natively by expo-audio's playback service via "lockScreenCommand".
+  // (also "favorite", from the heart button added by the same patch)
   const nextRef = useRef(next);
   const previousRef = useRef(previous);
   nextRef.current = next;
@@ -670,6 +716,8 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
           nextRef.current();
         } else if (command === "previous") {
           previousRef.current();
+        } else if (command === "favorite" && currentSongRef.current) {
+          toggleFavoriteRef.current(currentSongRef.current.id);
         }
       },
     );
@@ -814,6 +862,16 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
     },
     [favoriteIds, runWithUndo],
   );
+
+  const toggleFavoriteRef = useRef(toggleFavorite);
+  toggleFavoriteRef.current = toggleFavorite;
+
+  // Keep the notification's heart icon in sync, whichever screen changed it.
+  useEffect(() => {
+    if (lockScreenActiveRef.current && currentSongRef.current) {
+      updateLockScreen(currentSongRef.current);
+    }
+  }, [favoriteIds, updateLockScreen]);
 
   const isFavorite = useCallback(
     (songId: string) => favoriteIds.has(songId),
@@ -981,6 +1039,7 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
         });
       } catch (e) {
         console.warn("Failed to delete song:", e);
+        Alert.alert("Error", "No se pudo eliminar la canción.");
       }
     },
     [songs, player, setPlayingState],
@@ -989,85 +1048,119 @@ function MusicPlayerInner({ children }: { children: React.ReactNode }) {
   // === Sleep Timer ===
   const setSleepTimer = useCallback(
     (minutes: number) => {
-      // Clear existing timer
       if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
-      const totalSeconds = minutes * 60;
-      setSleepTimerRemaining(totalSeconds);
-
-      sleepTimerRef.current = setInterval(() => {
-        setSleepTimerRemaining((prev) => {
-          if (prev === null || prev <= 1) {
-            // Timer done - pause playback
-            if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
-            sleepTimerRef.current = null;
-            player.pause();
-            setPlayingState(false);
-            saveCurrentState();
-            return null;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+      sleepEndRef.current = Date.now() + minutes * 60 * 1000;
+      setSleepTimerRemaining(minutes * 60);
+      sleepTimerRef.current = setInterval(checkSleepTimer, 1000);
     },
-    [player, setPlayingState, saveCurrentState],
+    [checkSleepTimer],
   );
 
-  const cancelSleepTimer = useCallback(() => {
-    if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
-    sleepTimerRef.current = null;
-    setSleepTimerRemaining(null);
-  }, []);
+  const cancelSleepTimer = clearSleepTimer;
 
-  const value: MusicPlayerContextType = {
-    songs,
-    isLoadingLibrary,
-    currentSong,
-    isPlaying,
-    queue,
-    queueIndex,
-    volume,
-    isMuted,
-    isShuffleOn,
-    repeatMode,
-    playbackRate,
-    favoriteIds,
-    playlists,
-    playCounts,
-    sleepTimerRemaining,
-    recentSongIds,
-    undoMessage,
-    loadDeviceMusic,
-    pickMusicFiles,
-    playSong,
-    shufflePlay,
-    togglePlayPause,
-    pause,
-    resume,
-    next,
-    previous,
-    seekTo,
-    setVolume,
-    toggleMute,
-    toggleShuffle,
-    cycleRepeatMode,
-    setPlaybackRate,
-    playNext,
-    removeFromQueue,
-    clearQueue,
-    toggleFavorite,
-    isFavorite,
-    createPlaylist,
-    deletePlaylist,
-    addSongToPlaylist,
-    removeSongFromPlaylist,
-    reorderPlaylistSong,
-    playPlaylist,
-    deleteSongFromDevice,
-    setSleepTimer,
-    cancelSleepTimer,
-    undoLast,
-    dismissUndo,
-  };
+  const value = useMemo<MusicPlayerContextType>(
+    () => ({
+      songs,
+      isLoadingLibrary,
+      currentSong,
+      isPlaying,
+      queue,
+      queueIndex,
+      volume,
+      isMuted,
+      isShuffleOn,
+      repeatMode,
+      playbackRate,
+      favoriteIds,
+      playlists,
+      playCounts,
+      sleepTimerRemaining,
+      recentSongIds,
+      undoMessage,
+      loadDeviceMusic,
+      pickMusicFiles,
+      playSong,
+      shufflePlay,
+      togglePlayPause,
+      pause,
+      resume,
+      next,
+      previous,
+      seekTo,
+      setVolume,
+      toggleMute,
+      toggleShuffle,
+      cycleRepeatMode,
+      setPlaybackRate,
+      playNext,
+      removeFromQueue,
+      clearQueue,
+      toggleFavorite,
+      isFavorite,
+      createPlaylist,
+      deletePlaylist,
+      addSongToPlaylist,
+      removeSongFromPlaylist,
+      reorderPlaylistSong,
+      playPlaylist,
+      deleteSongFromDevice,
+      setSleepTimer,
+      cancelSleepTimer,
+      undoLast,
+      dismissUndo,
+    }),
+    [
+      songs,
+      isLoadingLibrary,
+      currentSong,
+      isPlaying,
+      queue,
+      queueIndex,
+      volume,
+      isMuted,
+      isShuffleOn,
+      repeatMode,
+      playbackRate,
+      favoriteIds,
+      playlists,
+      playCounts,
+      sleepTimerRemaining,
+      recentSongIds,
+      undoMessage,
+      loadDeviceMusic,
+      pickMusicFiles,
+      playSong,
+      shufflePlay,
+      togglePlayPause,
+      pause,
+      resume,
+      next,
+      previous,
+      seekTo,
+      setVolume,
+      toggleMute,
+      toggleShuffle,
+      cycleRepeatMode,
+      setPlaybackRate,
+      playNext,
+      removeFromQueue,
+      clearQueue,
+      toggleFavorite,
+      isFavorite,
+      createPlaylist,
+      deletePlaylist,
+      addSongToPlaylist,
+      removeSongFromPlaylist,
+      reorderPlaylistSong,
+      playPlaylist,
+      deleteSongFromDevice,
+      setSleepTimer,
+      cancelSleepTimer,
+      undoLast,
+      dismissUndo,
+    ],
+  );
+
 
   return (
     <MusicPlayerContext.Provider value={value}>
